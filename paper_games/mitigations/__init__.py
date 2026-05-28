@@ -22,5 +22,6 @@ The three Phase-1 mitigations will each ship as a follow-up branch:
 - ``invariance_requirement``: gates publication on k-context agreement.
 """
 from .base import Mitigation, NoMitigation, StudyResult
+from .pre_registration import PreRegistration
 
-__all__ = ["Mitigation", "NoMitigation", "StudyResult"]
+__all__ = ["Mitigation", "NoMitigation", "PreRegistration", "StudyResult"]
