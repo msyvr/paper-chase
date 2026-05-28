@@ -40,16 +40,34 @@ def run(cfg: SimConfig) -> SimResult:
     literature = Literature()
     history: list[dict] = []
 
+    # Per-(hypothesis, context) shared error shock. Drawn once when the (h, ctx)
+    # pair is first studied, then reused for the rest of the run. Models "the
+    # shared substrate has the same blind spot every time it sees this hypothesis
+    # in this setup." Only populated when ρ > 0, to preserve exact RNG sequencing
+    # against the Phase-0 baseline.
+    shocks: dict[tuple[int, int], float] = {}
+    use_shocks = cfg.study.correlated_error_rho > 0.0
+
     for t in range(cfg.n_steps):
         for agent in agents:
             action = agent.choose_action(world, literature, cfg.incentive, rng)
             hypothesis = world[action.target_id]
+
+            if use_shocks:
+                key = (action.target_id, action.context_id)
+                if key not in shocks:
+                    shocks[key] = float(rng.standard_normal())
+                shared_shock = shocks[key]
+            else:
+                shared_shock = 0.0
+
             significant, observed_effect = run_study(
                 hypothesis=hypothesis,
                 sample_size=action.sample_size,
                 qrp_intensity=action.qrp_intensity,
                 study_cfg=cfg.study,
                 rng=rng,
+                shared_shock=shared_shock,
             )
             reward = compute_reward(action.kind, significant, action.sample_size, cfg.incentive)
             agent.receive_reward(reward)
@@ -78,6 +96,7 @@ def run(cfg: SimConfig) -> SimResult:
                         sample_size=action.sample_size,
                         is_true=hypothesis.is_true,
                         timestep=t,
+                        context_id=action.context_id,
                     )
                 )
 

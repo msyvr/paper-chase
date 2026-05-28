@@ -18,6 +18,9 @@ class Finding:
     sample_size: int
     is_true: bool                        # ground truth — used by metrics, NOT by agents
     timestep: int
+    context_id: int = 0                  # the measurement context the study was run in
+                                         # (used by the correlated-error shock key and by
+                                         # the Phase-1 invariance mitigation)
 
 
 class Literature:

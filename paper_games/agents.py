@@ -32,6 +32,12 @@ class Action:
     # credit-to-original-author when replication succeeds (Phase 1 mitigation-2
     # variant; see IncentiveConfig.replication_credit_to_original_author).
     original_author_id: int | None = None
+    # The measurement context this study is run in. The correlated-error shared
+    # shock keys on (hypothesis_id, context_id), so two studies sharing a context
+    # share their shock; studies in different contexts get independent shocks.
+    # Phase 0/1.A: all actions use context_id = 0 (single context). Phase 1.C's
+    # invariance mitigation will vary it per study.
+    context_id: int = 0
 
 
 @dataclass(frozen=True)
