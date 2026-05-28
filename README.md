@@ -44,3 +44,12 @@ uv run python scripts/run_baseline.py  # produces results/validity_gate.png
 - **discovery rate** = TP / (TP + FN) = recall (field-level power)
 - Pareto gives a read on both and is necessary here since precision is gameable \
   ('publish nothing' maps to precision = 1)
+
+## Acknowledgments
+
+The framing — replication crisis in *automated* science as a problem worth
+stress-testing via simulation of mitigations — is from one of the project
+bullets on Konstantinos Voudouris's
+[Pivotal mentor profile](https://www.pivotal-research.org/mentors#konstantinos-voudouris).
+The implementation here is mine; design choices, errors, and stylized parameter
+values are mine alone.
