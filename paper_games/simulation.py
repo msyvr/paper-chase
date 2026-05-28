@@ -1,9 +1,14 @@
 """The core simulation loop.
 
 One step = every agent picks an action, runs a study, possibly publishes.
+Mitigations (if any) hook in at three points per step:
+  - constrain_action   before the study runs,
+  - gate_publish       to suppress or modify the candidate Finding,
+  - post_step          for end-of-step replication scans, retractions, etc.
 
-(current) Phase 0 baseline: 
-no mitigations, no correlated errors, no selection, parametric agents only.
+With ``mitigations=None`` (or ``[]``), behavior is identical to the Phase-0
+baseline: no mitigations, no correlated errors at ρ=0, no selection, parametric
+agents only.
 """
 from __future__ import annotations
 from dataclasses import dataclass
@@ -16,6 +21,7 @@ from .study import run_study
 from .literature import Literature, Finding
 from .incentives import compute_reward
 from .metrics import summary
+from .mitigations import Mitigation, StudyResult
 
 
 @dataclass
@@ -27,18 +33,23 @@ class SimResult:
     cfg: SimConfig
 
 
-def run(cfg: SimConfig) -> SimResult:
+def run(cfg: SimConfig, mitigations: list[Mitigation] | None = None) -> SimResult:
     """Run the simulation and return the result.
 
     The single source of randomness used by the loop is seeded by `cfg.seed`.
     `cfg.world.seed` independently seeds the ground-truth world (so you can
     re-use a world across sim seeds, or vary either independently).
+
+    Mitigations, if provided, hook in via ``constrain_action``, ``gate_publish``,
+    and ``post_step`` (see ``paper_games.mitigations``). With ``mitigations``
+    None or empty, behavior is identical to the Phase-0 baseline.
     """
     rng = np.random.default_rng(cfg.seed)
     world = World(cfg.world)
     agents = make_agents(cfg.agent, rng)
     literature = Literature()
     history: list[dict] = []
+    mit_list: list[Mitigation] = list(mitigations) if mitigations else []
 
     # Per-(hypothesis, context) shared error shock. Drawn once when the (h, ctx)
     # pair is first studied, then reused for the rest of the run. Models "the
@@ -51,6 +62,11 @@ def run(cfg: SimConfig) -> SimResult:
     for t in range(cfg.n_steps):
         for agent in agents:
             action = agent.choose_action(world, literature, cfg.incentive, rng)
+
+            # Mitigation hook 1: constrain the action before it executes.
+            for m in mit_list:
+                action = m.constrain_action(action, rng)
+
             hypothesis = world[action.target_id]
 
             if use_shocks:
@@ -86,19 +102,40 @@ def run(cfg: SimConfig) -> SimResult:
                     cfg.incentive.replication_credit_to_original_author
                 )
 
+            # Mitigation hook 2: gate the publication.
+            # Only significant studies produce candidate Findings; mitigations
+            # may suppress (return None) or modify the Finding as it flows
+            # through the chain.
             if significant:
-                literature.add(
-                    Finding(
-                        hypothesis_id=action.target_id,
-                        agent_id=agent.id,
-                        kind=action.kind,
-                        observed_effect=observed_effect,
-                        sample_size=action.sample_size,
-                        is_true=hypothesis.is_true,
-                        timestep=t,
-                        context_id=action.context_id,
-                    )
+                candidate: Finding | None = Finding(
+                    hypothesis_id=action.target_id,
+                    agent_id=agent.id,
+                    kind=action.kind,
+                    observed_effect=observed_effect,
+                    sample_size=action.sample_size,
+                    is_true=hypothesis.is_true,
+                    timestep=t,
+                    context_id=action.context_id,
                 )
+                if mit_list:
+                    result = StudyResult(
+                        action=action,
+                        significant=significant,
+                        observed_effect=observed_effect,
+                        hypothesis=hypothesis,
+                        agent_id=agent.id,
+                        timestep=t,
+                    )
+                    for m in mit_list:
+                        candidate = m.gate_publish(result, candidate, literature, rng)
+                        if candidate is None:
+                            break
+                if candidate is not None:
+                    literature.add(candidate)
+
+        # Mitigation hook 3: end-of-step bookkeeping (replications, retractions).
+        for m in mit_list:
+            m.post_step(t, literature, world, agents, rng)
 
         if t % cfg.snapshot_every == 0 or t == cfg.n_steps - 1:
             history.append(summary(literature, world, t))
