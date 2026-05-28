@@ -1,0 +1,28 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "paper-games"
+version = "0.1.0"
+description = "Agent-based simulation of automated science under publish-or-perish incentives."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "Monica Spisar" }]
+dependencies = [
+    "numpy>=1.26",
+    "scipy>=1.11",
+    "matplotlib>=3.8",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["paper_games"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
