@@ -22,7 +22,7 @@ dev = [
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["paper_games"]
+packages = ["paper_chase"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

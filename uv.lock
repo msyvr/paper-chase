@@ -419,7 +419,7 @@ wheels = [
 ]
 
 [[package]]
-name = "paper-games"
+name = "paper-chase"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [

@@ -3,10 +3,10 @@ import math
 import numpy as np
 import pytest
 
-from paper_games.config import WorldConfig
-from paper_games.world import World, Hypothesis
-from paper_games.literature import Literature, Finding
-from paper_games.metrics import truth_content, discovery_rate
+from paper_chase.config import WorldConfig
+from paper_chase.world import World, Hypothesis
+from paper_chase.literature import Literature, Finding
+from paper_chase.metrics import truth_content, discovery_rate
 
 
 def _world_with_n_true(n_hypotheses: int, n_true: int) -> World:

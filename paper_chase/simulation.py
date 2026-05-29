@@ -41,7 +41,7 @@ def run(cfg: SimConfig, mitigations: list[Mitigation] | None = None) -> SimResul
     re-use a world across sim seeds, or vary either independently).
 
     Mitigations, if provided, hook in via ``constrain_action``, ``gate_publish``,
-    and ``post_step`` (see ``paper_games.mitigations``). With ``mitigations``
+    and ``post_step`` (see ``paper_chase.mitigations``). With ``mitigations``
     None or empty, behavior is identical to the Phase-0 baseline.
     """
     rng = np.random.default_rng(cfg.seed)

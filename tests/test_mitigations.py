@@ -17,12 +17,12 @@ Pre-registration (Stage 1.B-prereg):
 import numpy as np
 import pytest
 
-from paper_games.agents import Action
-from paper_games.config import (
+from paper_chase.agents import Action
+from paper_chase.config import (
     SimConfig, IncentiveConfig, AgentConfig, WorldConfig, StudyConfig,
 )
-from paper_games.simulation import run
-from paper_games.mitigations import Mitigation, NoMitigation, PreRegistration
+from paper_chase.simulation import run
+from paper_chase.mitigations import Mitigation, NoMitigation, PreRegistration
 
 
 def _common_cfg() -> SimConfig:

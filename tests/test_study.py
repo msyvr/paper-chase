@@ -6,9 +6,9 @@ trustworthy. Monte-Carlo with generous tolerance bands (≈ 2σ).
 import numpy as np
 import pytest
 
-from paper_games.world import Hypothesis
-from paper_games.study import run_study, effective_alpha
-from paper_games.config import StudyConfig
+from paper_chase.world import Hypothesis
+from paper_chase.study import run_study, effective_alpha
+from paper_chase.config import StudyConfig
 
 
 N_TRIALS = 20_000  # Monte-Carlo budget — fast (~1s) and tight enough for the bands below.

@@ -1,8 +1,8 @@
 """Tests for the main simulation loop — credit-dispatch behavior, end-to-end shape."""
-from paper_games.config import (
+from paper_chase.config import (
     SimConfig, IncentiveConfig, AgentConfig, WorldConfig,
 )
-from paper_games.simulation import run
+from paper_chase.simulation import run
 
 
 def test_credit_to_original_author_increases_total_payoff():

@@ -24,10 +24,10 @@ from __future__ import annotations
 import numpy as np
 import matplotlib.pyplot as plt
 
-from paper_games.config import SimConfig, IncentiveConfig
-from paper_games.simulation import run
-from paper_games.plots import plot_metrics_vs_pressure, plot_pareto_plane
-from paper_games.results_io import (
+from paper_chase.config import SimConfig, IncentiveConfig
+from paper_chase.simulation import run
+from paper_chase.plots import plot_metrics_vs_pressure, plot_pareto_plane
+from paper_chase.results_io import (
     make_run_dir, save_config_json, save_data_csv, capture_git_state,
 )
 
