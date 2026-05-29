@@ -47,7 +47,7 @@ def _common_cfg() -> SimConfig:
             n_agents=10, qrp_mean=0.2, qrp_sd=0.0,
             effort_mean=30.0, effort_sd=0.0, p_replicate=0.3,
         ),
-        study=StudyConfig(alpha=0.05, qrp_alpha_max=0.50, correlated_error_rho=0.0),
+        study=StudyConfig(alpha=0.05, qrp_alpha_max=0.50, bias_strength=0.0),
         incentive=IncentiveConfig(novel_weight=10.0, replication_weight=1.0, effort_cost_per_sample=0.0),
         n_steps=20,
         seed=0,

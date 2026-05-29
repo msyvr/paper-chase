@@ -44,23 +44,31 @@ class StudyConfig:
     # TODO sensitivity-check qrp_alpha_max; coin-flip value selected as not modeling outright fraud
     # justified by Simmons, Nelson & Simonsohn (2011), False-Positive Psychology result: 0.6 max
     qrp_alpha_max: float = 0.50          # ceiling on QRP-inflated false-positive rate
-    # Correlation strength between errors of studies sharing a (hypothesis, context).
-    # ρ = 0 → independent errors (Phase-0 default; human-science baseline).
-    # ρ = 1 → fully shared error: studies of the same (hypothesis, context) all see the
-    #         same decision-statistic noise component (extreme shared-base-model case).
-    # The shared shock is drawn once per (hypothesis, context) in the sim loop and reused
-    # across all studies of that pair for the whole run — modelling "the shared substrate
-    # has the same blind spot every time it sees this hypothesis in this setup."
-    correlated_error_rho: float = 0.0
+    # Strength of per-(hypothesis, context) systematic bias in the decision statistic.
+    # The model is *additive*: each (h, ctx) draws a fixed bias b ~ N(0, bias_strength²)
+    # once, then every study of that (h, ctx) sees the same b added to its noncentrality,
+    # with a *fresh, unscaled* private noise term on top:
+    #     Z = δ + bias + private,  bias ~ N(0, bias_strength²),  private ~ N(0, 1)
+    # This is the right structure for "studies share a systematic bias but each has its
+    # own independent sampling noise" — Var(private) does NOT depend on bias_strength.
+    # (The previous formulation used a Gaussian-copula trick that traded private for
+    # shared noise to keep total variance at 1; that's mathematically valid as a pure
+    # correlation parameter but it artificially shrinks audit-replicate noise at high
+    # ρ — same-base audits become near-deterministic, which doesn't reflect how
+    # systematic bias actually works.)
+    # bias_strength = 0 → independent errors (Phase-0 default; human-science baseline).
+    # bias_strength ≈ 1 → per-(h,ctx) bias has the same scale as sampling noise.
+    # bias_strength > 1 → bias dominates; systematic limitation drives most outcomes.
+    bias_strength: float = 0.0
 
     def __post_init__(self) -> None:
         if not 0.0 < self.alpha < 1.0:
             raise ValueError(f"alpha must be in (0, 1), got {self.alpha}")
         if not self.alpha <= self.qrp_alpha_max < 1.0:
             raise ValueError(f"qrp_alpha_max must satisfy alpha <= qrp_alpha_max < 1, got {self.qrp_alpha_max}")
-        if not 0.0 <= self.correlated_error_rho <= 1.0:
+        if self.bias_strength < 0.0:
             raise ValueError(
-                f"correlated_error_rho must be in [0, 1], got {self.correlated_error_rho}"
+                f"bias_strength must be >= 0, got {self.bias_strength}"
             )
 
 

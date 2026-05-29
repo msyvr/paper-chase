@@ -91,7 +91,7 @@ class InvarianceRequirement:
         self,
         t: int,
         cfg: SimConfig,
-        shocks: dict[tuple[int, int], float],
+        biases: dict[tuple[int, int], float],
         literature: Literature,
         world: World,
         agents: list[ParametricAgent],

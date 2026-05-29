@@ -2,11 +2,12 @@
 
 Models post-publication scrutiny: each step, sample a fraction of standing
 findings, run a fresh study on each, and retract any whose audit replication
-is non-significant. The audit study uses the SAME shared error shock as the
-original (per (hypothesis, context) from the sim's ``shocks`` dict) — modelling
-"audit by the same base model." This is the realistic baseline; cross-model
-audits (audit using a different base model → independent shock) is a planned
-variant.
+is non-significant. The audit study uses the SAME per-(hypothesis, context)
+systematic bias as the original (from the sim's ``biases`` dict) — modelling
+"audit by the same base model." The audit's *private* (sampling) noise is
+fresh; only the shared systematic bias is reused. This is the realistic
+baseline; cross-model audits (audit using a different base model → independent
+bias draw) is a planned variant.
 
 This is the "+retraction" side of "incentivized replication + retraction." The
 "incentivized" side lives in :class:`IncentiveConfig` (raise ``replication_weight``
@@ -85,7 +86,7 @@ class ReplicationAndRetraction:
         self,
         t: int,
         cfg: SimConfig,
-        shocks: dict[tuple[int, int], float],
+        biases: dict[tuple[int, int], float],
         literature: Literature,
         world: World,
         agents: list[ParametricAgent],
@@ -107,10 +108,12 @@ class ReplicationAndRetraction:
                 if self.audit_sample_size is not None
                 else target.sample_size
             )
-            # Same-base-model audit: reuse the shared shock the original saw.
-            # If ρ = 0 (shocks dict empty) the lookup falls back to 0, which is
-            # the correct neutral value for independent-error studies.
-            shared_shock = shocks.get((target.hypothesis_id, target.context_id), 0.0)
+            # Same-base-model audit: reuse the per-(h, ctx) systematic bias.
+            # If bias_strength = 0 (biases dict empty) the lookup falls back to
+            # 0, the neutral value for independent-error studies. The audit's
+            # private (sampling) noise is fresh — only the systematic bias is
+            # carried over.
+            bias = biases.get((target.hypothesis_id, target.context_id), 0.0)
 
             significant, _ = run_study(
                 hypothesis=hypothesis,
@@ -118,7 +121,7 @@ class ReplicationAndRetraction:
                 qrp_intensity=self.audit_qrp_intensity,
                 study_cfg=cfg.study,
                 rng=rng,
-                shared_shock=shared_shock,
+                bias=bias,
             )
 
             if not significant:

@@ -1,16 +1,24 @@
 """Study mechanics: the statistical engine.
 
 One study tests one hypothesis with a chosen sample size. The decision statistic
-Z has unit variance and is decomposed into:
+Z decomposes additively into
 
-    Z = noncentrality + ρ · shared_shock + sqrt(1 − ρ²) · private_noise
+    Z = noncentrality + bias + private
 
-where the noncentrality is `true_effect · sqrt(n)`, `shared_shock` is a per-
-(hypothesis, context) draw managed by the sim loop, and `private_noise` is a
-fresh standard-normal draw per study. ρ = `correlated_error_rho` from `StudyConfig`;
-ρ = 0 recovers the independent-error case (Phase 0 / standard ABM-of-science).
-ρ = 1 means all studies sharing a (hypothesis, context) see identical Z and
-either all reject or all accept — the extreme shared-substrate case.
+where the noncentrality is `true_effect · sqrt(n)`, `bias` is a per-
+(hypothesis, context) systematic offset (drawn once in the sim loop with
+standard deviation `StudyConfig.bias_strength` and reused for every study of
+that (h, ctx) pair), and `private` is a fresh standard-normal draw per study
+representing sampling noise.
+
+The bias and the private noise are **additive and independent**: Var(Z) under
+H0 = bias_strength² + 1. The private-noise variance is fixed at 1 regardless
+of bias_strength — this is the right structure for "studies share a systematic
+limitation but each has its own sampling noise."
+
+bias_strength = 0 recovers independent errors (the human-science baseline).
+bias_strength ≈ 1 means the systematic per-(h, ctx) bias has the same scale
+as the sampling noise. bias_strength > 1 means systematic limitations dominate.
 
 QRP intensity q ∈ [0, 1] inflates the effective false-positive rate from `alpha`
 toward `qrp_alpha_max` (caps aggressive p-hacking).
@@ -35,19 +43,39 @@ def run_study(
     qrp_intensity: float,
     study_cfg: StudyConfig,
     rng: np.random.Generator,
-    shared_shock: float = 0.0,
+    bias: float = 0.0,
 ) -> tuple[bool, float]:
     """Run one study; return (significant, observed_effect_estimate).
 
-    - Significance is a two-sided z-test at level `effective_alpha(qrp, cfg)`.
-    - Under null (true_effect = 0, ρ = 0): P(significant) = α_eff.
-    - Under alternative (ρ = 0): P(significant) ≈ Φ(d√n − z_{1−α_eff/2}).
-    - With ρ > 0 the shared component biases Z toward / away from significance
-      identically across all studies of the same (hypothesis, context) — so
-      pairs of such studies have correlated outcomes. The caller (sim loop)
-      is responsible for managing the shared_shock cache; here we just consume.
+    Parameters
+    ----------
+    hypothesis
+        The hypothesis being tested. Its ``true_effect`` enters the
+        decision statistic as ``true_effect · sqrt(sample_size)``.
+    sample_size
+        Number of samples in the study (must be >= 2).
+    qrp_intensity
+        QRP intensity ∈ [0, 1]; raises effective α from ``alpha`` toward
+        ``qrp_alpha_max``.
+    study_cfg
+        Study configuration (α, qrp_alpha_max, bias_strength).
+    rng
+        The shared sim RNG (consumed for the private noise draw).
+    bias
+        The pre-drawn per-(hypothesis, context) systematic bias. Callers
+        managing repeated studies of the same (h, ctx) pair must supply
+        the same value every time (same-base audit); a cross-base audit
+        passes a fresh independent draw; an independent-error baseline
+        passes 0.
 
-    By construction, Var(Z) = ρ² + (1 − ρ²) = 1 for any ρ ∈ [0, 1].
+    Notes
+    -----
+    Var(Z) under H0 = bias_strength² + 1 (NOT 1). The test uses the standard
+    z_{α/2} critical value, so non-zero bias_strength inflates the average
+    false-positive rate across (h, ctx) draws: pairs with positive bias
+    reject often, pairs with negative bias rarely. This is the intended
+    behaviour — it models how systematic limitations of a base model
+    inflate the literature's effective false-positive rate.
     """
     if sample_size < 2:
         raise ValueError(f"sample_size must be >= 2, got {sample_size}")
@@ -56,9 +84,8 @@ def run_study(
     z_crit = float(norm.ppf(1.0 - alpha_eff / 2.0))
 
     lam = hypothesis.true_effect * np.sqrt(sample_size)     # noncentrality
-    rho = study_cfg.correlated_error_rho
     private = float(rng.normal(0.0, 1.0))
-    z = float(lam + rho * shared_shock + np.sqrt(1.0 - rho * rho) * private)
+    z = float(lam + bias + private)
     significant = bool(abs(z) > z_crit)
 
     observed_effect = float(z / np.sqrt(sample_size))

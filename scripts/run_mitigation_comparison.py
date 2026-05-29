@@ -2,8 +2,8 @@
 
 Sweeps the novelty:replication reward ratio across each of the three Phase-1
 mitigations (plus the no-mitigation baseline and an all-on combination) at a
-fixed moderate correlated-error strength (ρ = 0.5) and a context space large
-enough for the invariance mitigation to operate (n_contexts = 4).
+fixed moderate systematic-bias strength (bias_strength = 0.5) and a context
+space large enough for the invariance mitigation to operate (n_contexts = 4).
 
 Plots one trajectory per mitigation on the precision–recall (Pareto) plane.
 Pareto dominance between mitigations is read directly off the plot: a
@@ -43,7 +43,13 @@ NOVELTY_WEIGHTS = [1.0, 2.0, 5.0, 10.0, 20.0, 50.0]
 N_SEEDS = 10
 REPLICATION_WEIGHT = 1.0
 EFFORT_COST_PER_SAMPLE = 0.02
-RHO = 0.5                # moderate correlated errors — where invariance should start to matter
+BIAS_STRENGTH = 0.5      # moderate per-(h, ctx) systematic bias (SD = 0.5) — about half
+                         # the scale of the per-study sampling noise; bias_strength = 0
+                         # is the independent-error baseline; 1.0 makes bias and sampling
+                         # noise comparable in scale; >1 means systematic limitations
+                         # dominate. Renamed from the old `RHO` after the 2026-05 noise-
+                         # model fix (additive bias replacing the Gaussian-copula trick
+                         # that artificially shrank audit noise at high ρ).
 N_CONTEXTS = 4           # gives invariance room (k up to 4 = must hit every context)
 N_HYPOTHESES = 10_000    # 10x the default so the action budget can't saturate recall;
                          # matches the realistic "vast hypothesis space, scarce attention"
@@ -69,7 +75,7 @@ N_STEPS = 500            # SimConfig default. Deliberately kept here rather than
 # (qrp_cap=0.0) isn't realistic and would only show an upper bound; we want a
 # fair comparison against output-side filters. Invariance is swept over its
 # strictness parameter k ∈ {2, 3, 4} since k=2 is the weakest setting and the
-# project's deeper claim is that higher k dominates under correlated errors.
+# project's deeper claim is that higher k dominates under systematic bias.
 MITIGATION_FACTORIES = {
     "none":                          lambda: [],
     "pre-registration (leaky)":      lambda: [PreRegistration(qrp_cap=0.1)],
@@ -86,12 +92,12 @@ MITIGATION_FACTORIES = {
 
 
 def main() -> None:
-    params = f"nw{NOVELTY_WEIGHTS[0]:g}-{NOVELTY_WEIGHTS[-1]:g}_seeds{N_SEEDS}_rho{RHO}_nctx{N_CONTEXTS}_nh{N_HYPOTHESES}_nsteps{N_STEPS}"
+    params = f"nw{NOVELTY_WEIGHTS[0]:g}-{NOVELTY_WEIGHTS[-1]:g}_seeds{N_SEEDS}_bs{BIAS_STRENGTH}_nctx{N_CONTEXTS}_nh{N_HYPOTHESES}_nsteps{N_STEPS}"
     run_dir = make_run_dir(experiment="mitigation_comparison", params=params)
     print(f"Run dir: {run_dir}")
 
     base_world = WorldConfig(n_hypotheses=N_HYPOTHESES, n_contexts=N_CONTEXTS, seed=0)
-    base_study = StudyConfig(correlated_error_rho=RHO)
+    base_study = StudyConfig(bias_strength=BIAS_STRENGTH)
 
     save_config_json(
         run_dir / "config.json",
@@ -102,7 +108,7 @@ def main() -> None:
             "n_seeds": N_SEEDS,
             "fixed_replication_weight": REPLICATION_WEIGHT,
             "fixed_effort_cost_per_sample": EFFORT_COST_PER_SAMPLE,
-            "rho": RHO,
+            "bias_strength": BIAS_STRENGTH,
             "n_contexts": N_CONTEXTS,
             "n_hypotheses": N_HYPOTHESES,
             "n_steps": N_STEPS,
@@ -197,7 +203,7 @@ def main() -> None:
 
     ax.set_title(
         "Phase 1.C — Mitigation comparison (Pareto plane)\n"
-        f"ρ = {RHO}, n_contexts = {N_CONTEXTS}, novelty-weight sweep, "
+        f"bias_strength = {BIAS_STRENGTH}, n_contexts = {N_CONTEXTS}, novelty-weight sweep, "
         f"{N_SEEDS} seeds/point"
     )
     fig.tight_layout()

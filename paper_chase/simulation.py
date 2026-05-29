@@ -7,8 +7,8 @@ Mitigations (if any) hook in at three points per step:
   - post_step          for end-of-step replication scans, retractions, etc.
 
 With ``mitigations=None`` (or ``[]``), behavior is identical to the Phase-0
-baseline: no mitigations, no correlated errors at ρ=0, no selection, parametric
-agents only.
+baseline: no mitigations, no systematic bias at bias_strength=0, no selection,
+parametric agents only.
 """
 from __future__ import annotations
 from dataclasses import dataclass
@@ -51,13 +51,15 @@ def run(cfg: SimConfig, mitigations: list[Mitigation] | None = None) -> SimResul
     history: list[dict] = []
     mit_list: list[Mitigation] = list(mitigations) if mitigations else []
 
-    # Per-(hypothesis, context) shared error shock. Drawn once when the (h, ctx)
-    # pair is first studied, then reused for the rest of the run. Models "the
-    # shared substrate has the same blind spot every time it sees this hypothesis
-    # in this setup." Only populated when ρ > 0, to preserve exact RNG sequencing
-    # against the Phase-0 baseline.
-    shocks: dict[tuple[int, int], float] = {}
-    use_shocks = cfg.study.correlated_error_rho > 0.0
+    # Per-(hypothesis, context) systematic bias. Drawn once when the (h, ctx)
+    # pair is first studied (with standard deviation `cfg.study.bias_strength`),
+    # then reused for the rest of the run. Models "the shared substrate has the
+    # same blind spot every time it sees this hypothesis in this setup." Only
+    # populated when bias_strength > 0, to preserve exact RNG sequencing against
+    # the independent-error baseline.
+    biases: dict[tuple[int, int], float] = {}
+    bias_sd = cfg.study.bias_strength
+    use_biases = bias_sd > 0.0
 
     for t in range(cfg.n_steps):
         for agent in agents:
@@ -69,13 +71,13 @@ def run(cfg: SimConfig, mitigations: list[Mitigation] | None = None) -> SimResul
 
             hypothesis = world[action.target_id]
 
-            if use_shocks:
+            if use_biases:
                 key = (action.target_id, action.context_id)
-                if key not in shocks:
-                    shocks[key] = float(rng.standard_normal())
-                shared_shock = shocks[key]
+                if key not in biases:
+                    biases[key] = float(rng.normal(0.0, bias_sd))
+                bias = biases[key]
             else:
-                shared_shock = 0.0
+                bias = 0.0
 
             significant, observed_effect = run_study(
                 hypothesis=hypothesis,
@@ -83,7 +85,7 @@ def run(cfg: SimConfig, mitigations: list[Mitigation] | None = None) -> SimResul
                 qrp_intensity=action.qrp_intensity,
                 study_cfg=cfg.study,
                 rng=rng,
-                shared_shock=shared_shock,
+                bias=bias,
             )
             reward = compute_reward(action.kind, significant, action.sample_size, cfg.incentive)
             agent.receive_reward(reward)
@@ -134,11 +136,12 @@ def run(cfg: SimConfig, mitigations: list[Mitigation] | None = None) -> SimResul
                     literature.add(candidate)
 
         # Mitigation hook 3: end-of-step bookkeeping (replications, retractions).
-        # Pass the full SimConfig and the shared-shock dict; mitigations that run
-        # their own audit studies need both (cfg.study for run_study; shocks to
-        # honor the same-(hypothesis, context) shared shock when ρ > 0).
+        # Pass the full SimConfig and the per-(h, ctx) bias dict; mitigations that
+        # run their own audit studies need both (cfg.study for run_study; biases
+        # to honor the same-(hypothesis, context) systematic bias on same-base
+        # audits — a cross-base audit would draw a fresh bias instead).
         for m in mit_list:
-            m.post_step(t, cfg, shocks, literature, world, agents, rng)
+            m.post_step(t, cfg, biases, literature, world, agents, rng)
 
         if t % cfg.snapshot_every == 0 or t == cfg.n_steps - 1:
             history.append(summary(literature, world, t))
