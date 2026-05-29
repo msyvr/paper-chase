@@ -28,3 +28,46 @@ visualised directly.
 
 Validity gate passed: the engine produces the known phenomenon under the
 simplest configuration, licensing the work to proceed to mitigations.
+
+---
+
+## Phase 1.C — Mitigation comparison (Pareto plane)
+
+**What was run.** Sweep of the novelty:replication reward ratio across
+{1, 2, 5, 10, 20, 50} × {no mitigation, pre-registration,
+replication+retraction, invariance (k=2), all-on}; 3 seeds per condition.
+Correlated errors active at ρ = 0.5 (moderate); n_contexts = 4 to give
+the invariance mitigation room to operate.
+Script: [`scripts/run_mitigation_comparison.py`](../scripts/run_mitigation_comparison.py).
+
+**Result.**
+
+![Phase 1.C mitigation comparison](images/phase-1c-mitigation-comparison.png)
+
+**Interpretation.** Three mitigations sit on the Pareto frontier, each with a
+different precision–recall trade-off:
+
+- **Pre-registration** (precision ≈ 0.70, recall ≈ 0.99, *flat across pressure*) —
+  kills QRP at the source, so incentive pressure no longer matters; the
+  trajectory collapses to a single point. Best when high recall matters.
+- **Replication + retraction** (precision ≈ 0.94, recall ≈ 0.70) — audit-and-prune
+  trims false positives aggressively but at recall cost.
+- **All-on** (precision ≈ 0.99, recall ≈ 0.54) — also pressure-invariant for the
+  same reason as pre-reg; precision approaches the ceiling but recall takes a
+  further hit from the audit on top of the pre-reg recall loss.
+
+Two mitigations are Pareto-*dominated* at this ρ:
+
+- **No mitigation** (precision 0.35–0.47, recall ≈ 1.0) — every mitigation beats it.
+- **Invariance (k = 2)** alone (precision 0.49–0.66, recall ≈ 0.99) — improves
+  modestly over no mitigation but doesn't outperform pre-registration. At
+  ρ = 0.5, k = 2 is evidently not strict enough to consistently break through
+  correlated-error false positives. The project's deeper claim — *invariance
+  dominates replication-style mitigations under sufficiently strong correlated
+  errors* — is regime-specific and warrants the **ρ-sweep planned for Phase 1.D**:
+  if invariance's advantage exists it should emerge at higher ρ and/or higher k.
+
+Note that **all-on does not strictly dominate every single mitigation** —
+mechanistically real: pre-reg eliminates the pressure dynamic by killing QRP,
+so adding the replication audit on top starts retracting true positives that
+just-barely cleared α, which costs recall.
