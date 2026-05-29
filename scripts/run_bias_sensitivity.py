@@ -62,7 +62,16 @@ from paper_chase.results_io import (
 
 
 # ---- Sweep parameters ----
-BIAS_STRENGTHS = [0.0, 0.25, 0.5, 0.75, 1.0]   # SD of per-(h, ctx) systematic bias
+# Extended range to test the high-correlation regime where R+R is
+# mechanistically expected to break (same-base audit can't distinguish
+# lucky-bias FPs from TPs when bias dominates the signal). Correlation
+# between same-(h, ctx) studies = bias_strength² / (1 + bias_strength²):
+#   bs=0.0  → corr=0.00 (independent)
+#   bs=0.5  → corr=0.20
+#   bs=1.0  → corr=0.50 (the previous sweep's max)
+#   bs=2.0  → corr=0.80 (LLM-instance-like regime)
+#   bs=5.0  → corr=0.96 (extreme; same-LLM near-deterministic)
+BIAS_STRENGTHS = [0.0, 0.5, 1.0, 2.0, 5.0]     # SD of per-(h, ctx) systematic bias
 N_SEEDS = 10
 NOVELTY_WEIGHT = 10.0          # mid-pressure: dynamic is fully developed but not extreme
 REPLICATION_WEIGHT = 1.0

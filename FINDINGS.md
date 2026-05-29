@@ -60,14 +60,25 @@ across two regime sweeps).
 
 ## 2. k=2 invariance is the structurally weakest version of the multi-context filter
 
-**Regime.** Same as Phase 1.D — bias_strength ∈ [0, 1.0], novelty_weight =
-10, n_contexts = 4, uniform attention.
+**Regime.** Phase 1.D extended — bias_strength ∈ {0, 0.5, 1.0, 2.0, 5.0},
+novelty_weight = 10, n_contexts = 4, uniform attention.
 
-**Result.** Invariance(k=2) precision falls steeply with bias_strength
-(0.82 at bs=0 → 0.47 at bs=1.0) while R+R precision falls modestly (0.93 →
-0.82). The gap *widens* against invariance as bias rises. See
-[Phase 1.D](example-runs/README.md#phase-1d--bias-strength-sensitivity),
-commit `2cb5d1e`.
+**Result.** Invariance(k=2) precision falls faster than R+R across the
+moderate-bias range, then converges to R+R at the extreme:
+
+| bias_strength | R+R precision | Inv(k=2) precision | Gap (R+R − Inv) |
+|---|---|---|---|
+| 0.0 | 0.93 | 0.82 | +0.11 |
+| 0.5 | 0.91 | 0.73 | +0.18 |
+| 1.0 | 0.82 | 0.47 | +0.35 |
+| 2.0 | 0.30 | 0.17 | +0.13 |
+| 5.0 | 0.11 | 0.11 | 0.00 |
+
+R+R precision is greater than or equal to invariance(k=2) precision at
+every bias_strength tested. They converge at bs=5 only because both have
+collapsed to the `none` precision floor (~0.11). The predicted invariance
+crossover does not occur at k=2. See
+[Phase 1.D](example-runs/README.md#phase-1d--bias-strength-sensitivity).
 
 **Mechanism.** Each context's bias is an independent N(0, bias_strength²)
 draw. For a false H to clear invariance(k) by chance, it needs positive
@@ -97,42 +108,57 @@ model).
 
 ---
 
-## 3. Same-base replication+retraction holds up at moderate bias correlation (≤ 0.5)
+## 3. Same-base R+R has a sharp cliff between bias_strength = 1 and 2
 
-**Regime.** Phase 1.D — bias_strength ∈ [0, 1.0], corresponding to
-correlation between same-(h, ctx) studies of ∈ [0, 0.5]. Same-base audit:
-audit shares the per-(h, ctx) systematic bias; private (sampling) noise is
-fresh.
+**Regime.** Phase 1.D extended — bias_strength ∈ {0, 0.5, 1.0, 2.0, 5.0},
+n_contexts=4, uniform attention, novelty_weight=10. Same-base audit:
+audit inherits the per-(h, ctx) systematic bias; private (sampling) noise
+is fresh.
 
-**Result.** R+R precision falls modestly with bias_strength (0.93 → 0.82
-across the sweep). Recall *rises* slightly (0.19 → 0.27) because at higher
-bias, true positives with positive systematic bias clear significance more
-reliably and audit confirms them. See [Phase 1.D](example-runs/README.md#phase-1d--bias-strength-sensitivity).
+**Result.** R+R precision is high and slowly-falling up to bs=1.0, then
+falls off a cliff:
+
+| bias_strength | Corr | R+R precision | R+R recall |
+|---|---|---|---|
+| 0.0 | 0.00 | 0.93 | 0.19 |
+| 0.5 | 0.20 | 0.91 | 0.22 |
+| 1.0 | 0.50 | 0.82 | 0.27 |
+| **2.0** | **0.80** | **0.30** | **0.39** |
+| 5.0 | 0.96 | 0.11 | 0.64 |
+
+The cliff between bs=1 and bs=2 is where bias_strength crosses the
+threshold at which `|bias|` is *on its own* large enough to drive
+significance (z_crit ≈ 1.96; at bs=1, P(|bias| > z_crit) ≈ 5%; at bs=2 it
+jumps to ~32%; at bs=5 it's ~69%). At extreme bias, R+R precision falls to
+the `none` floor — the audit can no longer distinguish FPs from TPs.
 
 **Mechanism.** Audit effectiveness depends on the audit's ability to
 distinguish lucky-by-private FPs (where the original's significance
-required favourable random sampling) from signal-bearing TPs. At moderate
-correlation, lucky-by-private FPs are caught by the audit's fresh sampling
-draw, which is independent of the original. Only lucky-by-bias FPs (where
-the systematic bias alone is strong enough to drive significance) survive
-audit, and at bs ≤ 1.0 these are a minority.
+required favourable random sampling) from signal-bearing TPs. The audit's
+fresh private noise breaks the original lucky-private draw, retracting
+those FPs. But the audit *inherits* the per-(h, ctx) bias, so any FP whose
+bias alone was enough to clear z_crit is confirmed by the audit. Below the
+cliff (bs ≤ 1), bias alone is rarely sufficient — bias + private together
+is the dominant FP path, and audit catches it. Above the cliff (bs ≥ 2),
+bias alone is the dominant FP path, and audit cannot retract it.
 
 **Real-world translation.** For LLM-based audit of LLM-generated findings,
-R+R is likely sufficient when the bias-derived correlation between original
-and audit is moderate (corresponding roughly to "LLMs that produce different
-outputs from different sampling temperatures even on the same prompt"). For
-domains where the audit LLM is the same model as the generator AND the
-model is highly confident on its blind spots (correlation ≥ 0.7–0.9),
-expect R+R to fail — switch to cross-model audit or multi-context invariance.
+same-base R+R is likely sufficient at moderate model-noise correlation
+(bs ≤ 1, corresponding to "different sampling temperatures produce
+materially different outputs on the same prompt"). For domains where the
+same-model audit produces highly-correlated outputs to the original
+(near-deterministic same-model behaviour — bs ≥ 2), same-base R+R is
+expected to break. In this regime, switch to cross-model audit (different
+base model, fresh bias) or use a mitigation that addresses bias directly
+(invariance with sufficient k).
 
-**What hasn't been tested.** The high-correlation regime (bias_strength
-≥ 2.0, correlation ≥ 0.8) where R+R is mechanistically expected to break.
-This is a cheap sweep extension worth running before Phase 2: bs ∈ {0,
-0.5, 1.0, 2.0, 5.0} would establish where the breakdown actually occurs.
+**What hasn't been tested.** Whether the cliff location depends on
+n_contexts, novelty_weight, audit_sample_size, or audit_fraction. We've
+only tested a single point in those parameter spaces; the cliff might
+shift with them.
 
-**Status.** Preliminary (only moderate-correlation regime tested;
-high-correlation prediction mechanistically clear but empirically
-unconfirmed).
+**Status.** Established (the cliff is sharp, mechanism is transparent,
+boundaries are explicit; replicated across two sweep ranges).
 
 ---
 
@@ -294,6 +320,66 @@ change qualitatively.
 
 **Status.** Established (mathematical mechanism plus empirical observation;
 the regime fix is well understood and reproducible).
+
+---
+
+## 8. At extreme bias, no mitigation provides precision lift; `none` Pareto-dominates
+
+**Regime.** Phase 1.D extended at bias_strength = 5.0 (correlation between
+same-(h, ctx) studies ≈ 0.96, n_contexts=4, uniform attention,
+novelty_weight=10).
+
+**Result.** At bs=5, every tested mitigation collapses to the same
+precision (≈ 0.11), which is also the `none` precision. They differ only
+in recall — and only in the wrong direction for them:
+
+| Mitigation | Precision | Recall | Position |
+|---|---|---|---|
+| `none` | 0.11 | 0.83 | **Pareto-dominant** |
+| `pre-reg (leaky)` | 0.11 | 0.81 | Dominated |
+| `replication+retraction` | 0.11 | 0.64 | Dominated (loses recall to audit retractions) |
+| `invariance (k=2)` | 0.11 | 0.44 | Dominated (loses recall to multi-context buffering) |
+
+At this bias regime, every mitigation costs recall without providing
+precision in return. `none` Pareto-dominates all four.
+
+**Mechanism.** At bs=5, P(|bias| > z_crit) ≈ 69% per (h, ctx). Bias alone
+drives significance for the majority of studies regardless of true effect,
+so the literature is overwhelmed with bias-driven findings (false
+positives, mostly). Mitigations that depend on filtering significance
+patterns lose their grip: R+R audits inherit the same lucky bias and
+confirm; invariance's per-context bias draws are not independent enough
+across contexts when each is large; pre-reg's QRP clamp doesn't touch
+bias. All converge to the bias-dominated FP floor.
+
+**Real-world translation.** **There is a bias regime above which
+publication-process mitigations stop helping.** If a deployment's
+systematic bias is strong enough (high per-(h, ctx) bias magnitude),
+no audit-style or invariance-style intervention can recover precision —
+they will only reduce throughput. The actionable inference: **at high
+expected bias, the right intervention is at the model/training level**
+(reduce the bias itself, or use a different model class), not at the
+publication-process level. Process mitigations are useful in a finite band
+of bias regimes; outside that band, address the bias directly or accept
+high false-positive rates.
+
+This is a strong claim with one important caveat: we have not tested high
+k under non-uniform attention. *Strict* invariance (k = n_contexts) might
+still filter even at high bias, because the multi-context requirement
+becomes geometrically harder for lucky biases to satisfy. The "no
+mitigation helps" claim should be read as "no *currently-feasible* mitigation
+at the regime currently testable" — Phase 2 might extend the useful band.
+
+**What hasn't been tested.** Whether the convergence point (bs at which
+all mitigations collapse to `none` precision) shifts with n_contexts,
+audit_sample_size, audit_fraction, or per-study effect size / sample size.
+The cliff in Finding 3 located the regime transition for R+R; the
+analogous transition for invariance and the collapse point for the whole
+mitigation set haven't been fully mapped.
+
+**Status.** Established at one parameter setting (extended Phase 1.D);
+mechanism is mechanistically transparent. Generalisation to other
+(n_contexts, k_contexts, audit parameters) settings is pending.
 
 ---
 

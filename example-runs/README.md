@@ -129,13 +129,17 @@ strictly that adding pre-reg and audit changes little.
 
 ## Phase 1.D — Bias-strength sensitivity
 
-**What was run.** Sweep of `bias_strength` across {0, 0.25, 0.5, 0.75, 1.0}
+**What was run.** Sweep of `bias_strength` across {0, 0.5, 1.0, 2.0, 5.0}
 at fixed `novelty_weight = 10`, over four mitigations: `none`,
 `pre-registration (leaky, qrp_cap=0.1)`, `replication+retraction
 (audit_fraction=0.1)`, and `invariance (k=2)`. 10 seeds per condition. Same
 regime as Phase 1.C (n_hypotheses=10000, n_contexts=4, n_steps=500, uniform
 hypothesis selection). High-k invariance (k=3, k=4) was excluded — Phase 1.C
 established they publish almost nothing in this sparse-attention regime.
+The sweep range was extended to bs=5 to test whether the bias correlation
+strong enough to defeat same-base R+R audit actually does so (correlation
+between same-(h, ctx) studies = bias_strength² / (1+bias_strength²), so
+bs=2 → 0.80, bs=5 → 0.96 — the "same-LLM near-deterministic" regime).
 Script: [`scripts/run_bias_sensitivity.py`](../scripts/run_bias_sensitivity.py).
 
 **The claim Phase 1.D is positioned to test.** *Invariance-style mitigations
@@ -149,23 +153,47 @@ independent bias draw, so a single lucky bias cannot carry an FP through.
 
 ![Phase 1.D bias sensitivity](images/phase-1d-bias-sensitivity.png)
 
-| Mitigation | Precision at bs=0 | Precision at bs=1 | Recall (~stable) |
-|---|---|---|---|
-| `none` | 0.41 | 0.22 | 0.76 |
-| `pre-registration (leaky)` | 0.57 | 0.28 | 0.72 |
-| `replication+retraction` | 0.93 | 0.82 | 0.19 → 0.27 |
-| `invariance (k=2)` | 0.82 | 0.47 | 0.39 → 0.37 |
+| Mitigation | bs=0 | bs=0.5 | bs=1 | bs=2 | bs=5 |
+|---|---|---|---|---|---|
+| `none` | 0.41 / 0.77 | 0.33 / 0.77 | 0.22 / 0.76 | 0.14 / 0.77 | 0.11 / 0.83 |
+| `pre-reg (leaky)` | 0.57 / 0.72 | 0.45 / 0.71 | 0.28 / 0.72 | 0.15 / 0.73 | 0.11 / 0.81 |
+| `replication+retraction` | 0.93 / 0.19 | 0.91 / 0.22 | 0.82 / 0.27 | **0.30 / 0.39** | 0.11 / 0.64 |
+| `invariance (k=2)` | 0.82 / 0.40 | 0.73 / 0.38 | 0.47 / 0.37 | 0.17 / 0.37 | 0.11 / 0.44 |
 
-**Where the data points.** At k=2 in this regime, the predicted crossover
-does not appear: R+R's precision falls slowly (0.93 → 0.82) while
-invariance(k=2)'s falls steeply (0.82 → 0.47), so the gap widens with bias
-rather than closing. **k=2 invariance is not the version of the claim that
-matters here** — the natural next test is *strict* invariance (k → n_contexts)
-under a regime where it has the data to function. That test isn't possible
-under the current uniform-attention model: at ~2.25 studies/H, k=3 catches
-~11% of true H and k=4 catches ~2% — too few findings to compare meaningfully
-against R+R. Phase 2's non-uniform-attention upgrade is the prerequisite for
-running it.
+*(precision / recall, bold marks the R+R cliff)*
+
+**Where the data points.** Two distinct dynamics show up across the
+extended range, neither of which is the predicted invariance-overtakes-R+R
+crossover:
+
+1. **The R+R cliff is real and dramatic** (bs=1 → bs=2). R+R precision
+   collapses from 0.82 to 0.30 over this single doubling of bias_strength.
+   This confirms the mechanism the project intuited — at high correlation,
+   the audit replicate inherits a per-(h, ctx) bias that's large enough on
+   its own to drive significance, so the fresh-private-noise trick no
+   longer suffices to retract lucky-bias FPs. **R+R is regime-specific,
+   not unconditionally robust.**
+
+2. **Invariance(k=2) collapses faster than R+R across the entire range.**
+   At every bias_strength tested, R+R precision ≥ invariance(k=2)
+   precision. They converge at bs=5 (both at 0.11, approximately the
+   `none` precision floor) — the predicted crossover does not occur at
+   k=2. The multi-context filter at minimum-k is structurally too
+   permissive to catch lucky-bias-in-2-of-4-contexts FPs at any tested bias.
+
+3. **At extreme bias (bs=5), all mitigations converge to the `none`
+   precision floor (~0.11)**, but only `none` preserves recall (0.83 vs.
+   R+R 0.64 vs. invariance 0.44). At this regime, `none` actually
+   Pareto-dominates all the mitigations — *they buy nothing at the cost of
+   recall*.
+
+**k=2 invariance is not the version of the claim that matters here** — the
+natural next test is *strict* invariance (k → n_contexts) under a regime
+where it has the data to function. That test isn't possible under the
+current uniform-attention model: at ~2.25 studies/H, k=3 catches ~11% of
+true H and k=4 catches ~2% — too few findings to compare meaningfully
+against R+R. Phase 2's non-uniform-attention upgrade is the prerequisite
+for running it.
 
 **Why k=2 invariance leaks**: each context's bias is an independent N(0,1)
 draw (at bs=1.0). For a false H to clear invariance k=2 by chance, it needs
@@ -176,15 +204,16 @@ H needs lucky bias in all 4 contexts — much rarer. So the bias-robustness
 prediction is geometrically tied to k, and k=2 is structurally the weakest
 version of the test.
 
-**Why R+R holds up at this regime**: audit replicates draw *fresh* private
-noise (this is the variance-fix; the previous broken model artificially
-shrank it). Lucky-by-private FPs get retracted at every audit cycle
-regardless of bias; only lucky-by-bias FPs (where the bias alone is enough
-to drive the audit Z above threshold) survive. At bs=1.0, that fraction
-grows but doesn't overwhelm — total FP retention rises slowly. R+R's
-per-finding-independent audit is structurally fit for catching the FPs that
-are easiest to catch (lucky-private), and that's most of them at moderate
-bias.
+**Why R+R holds up at moderate bias but breaks at high bias**: audit
+replicates draw *fresh* private noise (the variance-fix). At low-moderate
+bias (bs ≤ 1), most FPs are "lucky-by-bias-AND-private together" — bias
+alone is rarely big enough to clear z_crit on its own (z_crit ≈ 1.96; at
+bs=1.0, P(|bias| > z_crit) ≈ 5%), so audit's fresh private noise breaks
+the combination and retracts FPs. At high bias (bs ≥ 2), P(|bias| > z_crit)
+becomes substantial (≈ 32% at bs=2, ≈ 69% at bs=5) — bias alone drives
+significance, audit always confirms because it inherits the same bias,
+and R+R can no longer distinguish FPs from TPs. The cliff between bs=1
+and bs=2 corresponds to this transition.
 
 **Where this points next**:
 
@@ -192,17 +221,27 @@ bias.
    prerequisite for testing high-k invariance. Under power-law attention,
    heavily-studied H accumulate the multi-context coverage that lets k=3,
    k=4 invariance actually filter; the long tail keeps `none` recall
-   meaningful. This unlocks the *real* invariance vs. R+R comparison.
+   meaningful. This unlocks the *real* invariance vs. R+R comparison at
+   the regime (bs ≥ 2) where R+R has just been shown to break.
 
 2. **Phase 2.B — cross-base audit comparison**. A small extension to
    `ReplicationAndRetraction` (one boolean parameter) that draws a fresh
-   bias per audit instead of inheriting the (h, ctx) bias. The interesting
-   question: does R+R-under-cross-base still hold up at high bias? If yes,
-   the result generalizes (audit is structurally fit). If no, the project's
-   claim survives as "invariance dominates *same-base* R+R, but cross-base
-   R+R is equivalent."
+   bias per audit instead of inheriting the (h, ctx) bias. With the
+   same-base R+R cliff now empirically located at bs ≈ 1.5–2.0, the
+   directly-actionable question is whether cross-base audit pushes the
+   cliff to higher bias or eliminates it. If yes, the alignment-relevant
+   recommendation is "use cross-base audit when expected bias > some
+   threshold." If no, cross-base audit doesn't help and the recommendation
+   shifts to invariance.
 
-3. **Sensitivity sweeps within each mitigation**. `audit_fraction`,
+3. **The "useful band" framing.** Each mitigation appears to be effective
+   in a narrow range of bias_strengths. Below: not needed (precision is
+   acceptable without intervention). Above: not effective (precision
+   collapses regardless). The bands for each mitigation are worth
+   characterizing explicitly — that's the actionable artifact for
+   real-world governance.
+
+4. **Sensitivity sweeps within each mitigation**. `audit_fraction`,
    `audit_sample_size`, `k_contexts` × `n_contexts` joint sweeps — to map
    the parameter space rather than test single points.
 
