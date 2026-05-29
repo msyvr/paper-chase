@@ -22,6 +22,7 @@ from dataclasses import replace
 import numpy as np
 
 from ..agents import Action, ParametricAgent
+from ..config import SimConfig
 from ..literature import Finding, Literature
 from ..world import World
 from .base import StudyResult
@@ -67,6 +68,8 @@ class PreRegistration:
     def post_step(
         self,
         t: int,
+        cfg: SimConfig,
+        shocks: dict[tuple[int, int], float],
         literature: Literature,
         world: World,
         agents: list[ParametricAgent],

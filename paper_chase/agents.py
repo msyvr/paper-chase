@@ -80,17 +80,28 @@ class ParametricAgent:
             target_id = int(rng.integers(0, world.n_hypotheses))
             original_author_id = None
 
-        # Effective QRP modulated by incentive pressure.
-        # pressure_factor ∈ (0, 1): how much the system rewards novel positives
-        # relative to replications. When novel_weight >> replication_weight, pressure ≈ 1.
+        # Effective QRP modulated by incentive pressure, with back-end-credit
+        # deterrence when credit_to_original_author > 0.
         #
-        # PHASE 1 TODO: when `replication_credit_to_original_author > 0`, expected
-        # back-end credit on novel positives should reduce the effective QRP
-        # pressure (because QRP-driven false positives forfeit replication credit
-        # in expectation). Currently NOT wired — credit dispatch works, but the
-        # deterrence behavior won't appear until this calculation is updated.
-        total = incentive.novel_weight + incentive.replication_weight
-        pressure = incentive.novel_weight / total if total > 0 else 0.0
+        # pressure ∈ (0, 1): relative attractiveness of novel-positive work vs.
+        # replication. When novel_weight >> replication_weight, pressure ≈ 1.
+        #
+        # Deterrence (Phase-1 mitigation-2 variant): each unit of QRP inflates
+        # the FP rate, and FPs replicate much less reliably than TPs — so under
+        # credit-for-replication, each unit of QRP forfeits expected back-end
+        # credit. Per-unit-of-QRP forfeit ≈ credit × (P_REPL_CLEAN − P_REPL_QRP_MAX),
+        # which we subtract from the immediate novel reward. P_REPL_CLEAN ≈
+        # average power for honest findings, P_REPL_QRP_MAX ≈ α for QRP-driven
+        # false positives. Both are stylized.
+        P_REPL_CLEAN = 0.5
+        P_REPL_QRP_MAX = 0.05
+        qrp_attractiveness = max(
+            0.0,
+            incentive.novel_weight
+            - (P_REPL_CLEAN - P_REPL_QRP_MAX) * incentive.replication_credit_to_original_author,
+        )
+        total = qrp_attractiveness + incentive.replication_weight
+        pressure = qrp_attractiveness / total if total > 0 else 0.0
         effective_qrp = float(np.clip(self.traits.baseline_qrp * pressure, 0.0, 1.0))
 
         return Action(

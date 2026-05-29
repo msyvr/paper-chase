@@ -23,5 +23,12 @@ The three Phase-1 mitigations will each ship as a follow-up branch:
 """
 from .base import Mitigation, NoMitigation, StudyResult
 from .pre_registration import PreRegistration
+from .replication_retraction import ReplicationAndRetraction
 
-__all__ = ["Mitigation", "NoMitigation", "PreRegistration", "StudyResult"]
+__all__ = [
+    "Mitigation",
+    "NoMitigation",
+    "PreRegistration",
+    "ReplicationAndRetraction",
+    "StudyResult",
+]

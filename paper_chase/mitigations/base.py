@@ -23,6 +23,7 @@ from typing import Protocol, runtime_checkable
 import numpy as np
 
 from ..agents import Action, ParametricAgent
+from ..config import SimConfig
 from ..literature import Finding, Literature
 from ..world import Hypothesis, World
 
@@ -68,6 +69,8 @@ class Mitigation(Protocol):
     def post_step(
         self,
         t: int,
+        cfg: SimConfig,
+        shocks: dict[tuple[int, int], float],
         literature: Literature,
         world: World,
         agents: list[ParametricAgent],
@@ -102,6 +105,8 @@ class NoMitigation:
     def post_step(
         self,
         t: int,
+        cfg: SimConfig,
+        shocks: dict[tuple[int, int], float],
         literature: Literature,
         world: World,
         agents: list[ParametricAgent],

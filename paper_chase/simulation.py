@@ -134,8 +134,11 @@ def run(cfg: SimConfig, mitigations: list[Mitigation] | None = None) -> SimResul
                     literature.add(candidate)
 
         # Mitigation hook 3: end-of-step bookkeeping (replications, retractions).
+        # Pass the full SimConfig and the shared-shock dict; mitigations that run
+        # their own audit studies need both (cfg.study for run_study; shocks to
+        # honor the same-(hypothesis, context) shared shock when ρ > 0).
         for m in mit_list:
-            m.post_step(t, literature, world, agents, rng)
+            m.post_step(t, cfg, shocks, literature, world, agents, rng)
 
         if t % cfg.snapshot_every == 0 or t == cfg.n_steps - 1:
             history.append(summary(literature, world, t))

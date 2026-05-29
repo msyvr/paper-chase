@@ -13,16 +13,26 @@ Pre-registration (Stage 1.B-prereg):
 4. Under full pre-registration (qrp_cap=0), the literature's false-positive
    count collapses toward the no-QRP baseline (FPR ≈ α) even when agents have
    high baseline QRP traits and incentive pressure is high.
+
+Replication + retraction and QRP-deterrence wiring (Stage 1.B-replication):
+5. ``ReplicationAndRetraction`` validates its parameters and retracts FPs at high
+   ``audit_fraction`` (and preserves TPs of high power).
+6. ``replication_credit_to_original_author > 0`` lowers the effective QRP
+   intensity at action-time (the credit-for-replication deterrence wiring).
 """
 import numpy as np
 import pytest
 
-from paper_chase.agents import Action
+from paper_chase.agents import Action, AgentTraits, ParametricAgent
 from paper_chase.config import (
     SimConfig, IncentiveConfig, AgentConfig, WorldConfig, StudyConfig,
 )
+from paper_chase.literature import Literature
 from paper_chase.simulation import run
-from paper_chase.mitigations import Mitigation, NoMitigation, PreRegistration
+from paper_chase.mitigations import (
+    Mitigation, NoMitigation, PreRegistration, ReplicationAndRetraction,
+)
+from paper_chase.world import World
 
 
 def _common_cfg() -> SimConfig:
@@ -156,4 +166,157 @@ def test_pre_registration_collapses_fpr_under_pressure():
     assert n_prereg * 3 < n_baseline, (
         f"pre-registration should drastically reduce FPs; "
         f"got baseline={n_baseline}, prereg={n_prereg}"
+    )
+
+
+# ---- replication + retraction ----
+
+def test_replication_retraction_parameters_validated():
+    """Parameter validation: audit_fraction ∈ [0, 1], qrp ∈ [0, 1], sample_size >= 2 (or None)."""
+    with pytest.raises(ValueError):
+        ReplicationAndRetraction(audit_fraction=-0.1)
+    with pytest.raises(ValueError):
+        ReplicationAndRetraction(audit_fraction=1.1)
+    with pytest.raises(ValueError):
+        ReplicationAndRetraction(audit_qrp_intensity=-0.1)
+    with pytest.raises(ValueError):
+        ReplicationAndRetraction(audit_qrp_intensity=1.1)
+    with pytest.raises(ValueError):
+        ReplicationAndRetraction(audit_sample_size=1)
+
+
+def test_replication_retraction_zero_fraction_changes_nothing():
+    """With ``audit_fraction=0``, no audits run and the standing literature
+    matches the no-mitigation run exactly (no rng draws from this mitigation)."""
+    cfg = _common_cfg()
+    result_baseline = run(cfg, mitigations=None)
+    result_zero = run(cfg, mitigations=[ReplicationAndRetraction(audit_fraction=0.0)])
+    assert _literature_summary(result_baseline) == _literature_summary(result_zero)
+
+
+def test_replication_retraction_removes_false_positives():
+    """With ``audit_fraction=1.0`` and a pristine high-power audit, false positives
+    in the literature are retracted by their audit replications returning non-
+    significant. With all hypotheses null, every published finding is a FP."""
+    cfg = SimConfig(
+        world=WorldConfig(n_hypotheses=200, base_rate_true=0.0, seed=0),
+        agent=AgentConfig(
+            n_agents=20, qrp_mean=0.6, qrp_sd=0.0,
+            effort_mean=30.0, effort_sd=0.0, p_replicate=0.0,
+        ),
+        incentive=IncentiveConfig(
+            novel_weight=50.0, replication_weight=1.0, effort_cost_per_sample=0.0,
+        ),
+        n_steps=20,
+        seed=0,
+    )
+    result_baseline = run(cfg, mitigations=None)
+    result_with_audit = run(
+        cfg,
+        mitigations=[ReplicationAndRetraction(
+            audit_fraction=1.0, audit_sample_size=100, audit_qrp_intensity=0.0,
+        )],
+    )
+
+    n_baseline = len(result_baseline.literature.standing)
+    n_audited_standing = len(result_with_audit.literature.standing)
+    n_audited_retracted = len(result_with_audit.literature.retracted)
+
+    # With α=0.05 audits each step, FPs survive at ~5% per audit round → essentially
+    # all of the baseline's FPs end up retracted. Assert a 3× reduction with margin.
+    assert n_audited_standing * 3 < n_baseline, (
+        f"audit should drastically reduce FP count; "
+        f"got baseline={n_baseline}, audited standing={n_audited_standing}"
+    )
+    assert n_audited_retracted > 0, "some retractions must have occurred"
+
+
+def test_replication_retraction_preserves_strong_true_positives():
+    """High-power audits (n=100) of strong true effects (d=0.8) virtually never
+    retract — power is essentially 1, so audit replications are significant."""
+    cfg = SimConfig(
+        world=WorldConfig(
+            n_hypotheses=100, base_rate_true=1.0,
+            effect_size_mean=0.8, effect_size_sd=0.0, seed=0,
+        ),
+        agent=AgentConfig(
+            n_agents=10, qrp_mean=0.0, qrp_sd=0.0,
+            effort_mean=100.0, effort_sd=0.0, p_replicate=0.0,
+        ),
+        incentive=IncentiveConfig(
+            novel_weight=10.0, replication_weight=1.0, effort_cost_per_sample=0.0,
+        ),
+        n_steps=20,
+        seed=0,
+    )
+    result = run(
+        cfg,
+        mitigations=[ReplicationAndRetraction(
+            audit_fraction=1.0, audit_sample_size=100, audit_qrp_intensity=0.0,
+        )],
+    )
+    n_standing = len(result.literature.standing)
+    n_retracted = len(result.literature.retracted)
+    # Effectively all of the standing literature was once a TP. Retractions
+    # should be tiny relative to standing.
+    assert n_retracted < max(1, n_standing // 10), (
+        f"strong TPs should mostly survive audit; "
+        f"got standing={n_standing}, retracted={n_retracted}"
+    )
+
+
+# ---- QRP-deterrence wiring (credit-for-replication) ----
+
+def test_credit_for_replication_reduces_effective_qrp():
+    """With ``replication_credit_to_original_author > 0``, the agent's
+    effective_qrp at action-time drops vs. credit = 0 (same baseline trait,
+    same RNG seed)."""
+    traits = AgentTraits(baseline_qrp=0.5, effort=30, p_replicate=0.0)
+    agent = ParametricAgent(agent_id=0, traits=traits)
+    world = World(WorldConfig(n_hypotheses=10, base_rate_true=0.5, seed=0))
+    lit = Literature()
+
+    incentive_no_credit = IncentiveConfig(
+        novel_weight=10.0, replication_weight=1.0, effort_cost_per_sample=0.0,
+        replication_credit_to_original_author=0.0,
+    )
+    incentive_with_credit = IncentiveConfig(
+        novel_weight=10.0, replication_weight=1.0, effort_cost_per_sample=0.0,
+        replication_credit_to_original_author=15.0,
+    )
+
+    rng1 = np.random.default_rng(0)
+    action_no_credit = agent.choose_action(world, lit, incentive_no_credit, rng1)
+
+    rng2 = np.random.default_rng(0)
+    action_with_credit = agent.choose_action(world, lit, incentive_with_credit, rng2)
+
+    assert action_with_credit.qrp_intensity < action_no_credit.qrp_intensity, (
+        f"credit-for-replication should deter QRP; "
+        f"got with={action_with_credit.qrp_intensity}, without={action_no_credit.qrp_intensity}"
+    )
+
+
+def test_credit_for_replication_zero_credit_preserves_baseline_qrp_formula():
+    """With ``replication_credit_to_original_author = 0`` (default), the QRP
+    pressure formula reduces exactly to the no-deterrence form: pressure =
+    novel_weight / (novel + replication)."""
+    traits = AgentTraits(baseline_qrp=0.5, effort=30, p_replicate=0.0)
+    agent = ParametricAgent(agent_id=0, traits=traits)
+    world = World(WorldConfig(n_hypotheses=10, base_rate_true=0.5, seed=0))
+    lit = Literature()
+
+    incentive = IncentiveConfig(
+        novel_weight=10.0, replication_weight=1.0, effort_cost_per_sample=0.0,
+        replication_credit_to_original_author=0.0,
+    )
+    rng = np.random.default_rng(0)
+    action = agent.choose_action(world, lit, incentive, rng)
+
+    # Expected: baseline_qrp * novel / (novel + repl) = 0.5 * 10/11
+    expected_pressure = 10.0 / 11.0
+    expected_qrp = 0.5 * expected_pressure
+    assert action.qrp_intensity == pytest.approx(expected_qrp), (
+        f"with credit=0, formula must reduce to baseline; "
+        f"got {action.qrp_intensity}, expected {expected_qrp}"
     )
