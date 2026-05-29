@@ -17,6 +17,12 @@ class WorldConfig:
     # TODO sensitivity-check effect_size_mean
     effect_size_mean: float = 0.4       # Cohen's-d-like; modest but findable
     effect_size_sd: float = 0.15
+    # Number of distinct measurement contexts a study can be run in. When > 1,
+    # each Action.context_id is drawn uniformly from range(n_contexts); when = 1,
+    # context_id is fixed at 0 and the agent skips the rng draw (preserving RNG
+    # sequencing against single-context baselines). The InvarianceRequirement
+    # mitigation needs n_contexts >= k_contexts to be able to publish anything.
+    n_contexts: int = 1
     seed: int = 0
 
     def __post_init__(self) -> None:
@@ -26,6 +32,8 @@ class WorldConfig:
             raise ValueError(f"n_hypotheses must be positive, got {self.n_hypotheses}")
         if self.effect_size_mean <= 0:
             raise ValueError(f"effect_size_mean must be positive, got {self.effect_size_mean}")
+        if self.n_contexts <= 0:
+            raise ValueError(f"n_contexts must be positive, got {self.n_contexts}")
 
 
 @dataclass(frozen=True)

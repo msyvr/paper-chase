@@ -104,12 +104,20 @@ class ParametricAgent:
         pressure = qrp_attractiveness / total if total > 0 else 0.0
         effective_qrp = float(np.clip(self.traits.baseline_qrp * pressure, 0.0, 1.0))
 
+        # Context selection: draw rng only if there's more than one context
+        # available (preserves RNG sequencing for single-context Phase-0 baselines).
+        if world.cfg.n_contexts > 1:
+            context_id = int(rng.integers(0, world.cfg.n_contexts))
+        else:
+            context_id = 0
+
         return Action(
             target_id=target_id,
             kind=kind,
             sample_size=self.traits.effort,
             qrp_intensity=effective_qrp,
             original_author_id=original_author_id,
+            context_id=context_id,
         )
 
     def receive_reward(self, reward: float) -> None:

@@ -30,7 +30,11 @@ from paper_chase.config import (
 from paper_chase.literature import Literature
 from paper_chase.simulation import run
 from paper_chase.mitigations import (
-    Mitigation, NoMitigation, PreRegistration, ReplicationAndRetraction,
+    InvarianceRequirement,
+    Mitigation,
+    NoMitigation,
+    PreRegistration,
+    ReplicationAndRetraction,
 )
 from paper_chase.world import World
 
@@ -320,3 +324,90 @@ def test_credit_for_replication_zero_credit_preserves_baseline_qrp_formula():
         f"with credit=0, formula must reduce to baseline; "
         f"got {action.qrp_intensity}, expected {expected_qrp}"
     )
+
+
+# ---- invariance requirement ----
+
+def test_invariance_requirement_validates():
+    """``k_contexts`` must be >= 1."""
+    with pytest.raises(ValueError):
+        InvarianceRequirement(k_contexts=0)
+    with pytest.raises(ValueError):
+        InvarianceRequirement(k_contexts=-1)
+
+
+def test_world_config_n_contexts_validated():
+    """``n_contexts`` on WorldConfig must be positive."""
+    with pytest.raises(ValueError):
+        WorldConfig(n_contexts=0)
+    with pytest.raises(ValueError):
+        WorldConfig(n_contexts=-1)
+
+
+def test_invariance_k2_with_n_contexts_1_publishes_nothing():
+    """With n_contexts=1 and k_contexts=2, publication is unachievable — no
+    second context ever exists. Strong test of the gating mechanism."""
+    cfg = SimConfig(
+        world=WorldConfig(
+            n_hypotheses=10, base_rate_true=1.0,
+            effect_size_mean=0.8, effect_size_sd=0.0,
+            n_contexts=1, seed=0,
+        ),
+        agent=AgentConfig(
+            n_agents=20, qrp_mean=0.0, qrp_sd=0.0,
+            effort_mean=100.0, effort_sd=0.0, p_replicate=0.0,
+        ),
+        incentive=IncentiveConfig(
+            novel_weight=10.0, replication_weight=1.0, effort_cost_per_sample=0.0,
+        ),
+        n_steps=10,
+        seed=0,
+    )
+    result = run(cfg, mitigations=[InvarianceRequirement(k_contexts=2)])
+    assert len(result.literature.standing) == 0, (
+        "k=2 should be unachievable when n_contexts=1; literature must be empty"
+    )
+
+
+def test_invariance_k1_admits_first_significant_finding():
+    """``k_contexts=1`` is the trivial case — any significant finding publishes
+    immediately, behaving like NoMitigation for gating purposes."""
+    cfg = _common_cfg()
+    result_baseline = run(cfg, mitigations=None)
+    result_k1 = run(cfg, mitigations=[InvarianceRequirement(k_contexts=1)])
+    # Same RNG sequence, same gate behavior → identical standing literature.
+    assert _literature_summary(result_baseline) == _literature_summary(result_k1)
+
+
+def test_invariance_reduces_publications_under_multiple_contexts():
+    """With n_contexts=4 and k_contexts=2, the literature should hold fewer
+    findings than the no-mitigation baseline (each finding now represents
+    cross-context agreement rather than single-shot significance)."""
+    cfg = SimConfig(
+        world=WorldConfig(
+            n_hypotheses=50, base_rate_true=0.3,
+            effect_size_mean=0.4, effect_size_sd=0.1,
+            n_contexts=4, seed=0,
+        ),
+        agent=AgentConfig(
+            n_agents=20, qrp_mean=0.3, qrp_sd=0.0,
+            effort_mean=30.0, effort_sd=0.0, p_replicate=0.0,
+        ),
+        incentive=IncentiveConfig(
+            novel_weight=10.0, replication_weight=1.0, effort_cost_per_sample=0.0,
+        ),
+        n_steps=20,
+        seed=0,
+    )
+    result_baseline = run(cfg, mitigations=None)
+    result_invariance = run(cfg, mitigations=[InvarianceRequirement(k_contexts=2)])
+
+    n_baseline = len(result_baseline.literature.standing)
+    n_invariance = len(result_invariance.literature.standing)
+
+    assert n_invariance < n_baseline, (
+        f"invariance should reduce publications; got baseline={n_baseline}, "
+        f"invariance={n_invariance}"
+    )
+    # And the literature must not be empty — k=2 is achievable with n_contexts=4.
+    assert n_invariance > 0, "k=2 with n_contexts=4 should be reachable"
