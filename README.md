@@ -1,8 +1,8 @@
-# paper-games
+# paper-chase
 
 Agent-based simulation of automated science under publish-or-perish incentives.
 
-Paper-games is a multi-agent simulation of a scientific publishing ecosystem.
+Paper-chase is a multi-agent simulation of a scientific publishing ecosystem.
 The Pareto frontier for truth-content (precision) and discovery rate (recall)
 of the body of literature is evaluated as a function of increasing
 incentive pressure and agent scale.

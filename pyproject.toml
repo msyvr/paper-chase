@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "paper-games"
+name = "paper-chase"
 version = "0.1.0"
 description = "Agent-based simulation of automated science under publish-or-perish incentives."
 readme = "README.md"
