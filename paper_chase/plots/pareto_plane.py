@@ -105,11 +105,16 @@ def plot_pareto_plane(
 
     if mark_ideal:
         ax.plot(
-            1.0, 1.0, marker="*", color="goldenrod", markersize=14,
+            1.0, 1.0, marker="D", color="goldenrod", markersize=8,
             linestyle="None", label="ideal (1, 1)",
         )
-        ax.legend(loc="lower left")
 
+    # (Re)draw the legend at the end of every call so multi-trajectory overlays
+    # pick up every label; guard on having at least one labeled artist to avoid
+    # matplotlib's no-labels warning.
+    handles, _ = ax.get_legend_handles_labels()
+    if handles:
+        ax.legend(loc="lower left")
 
     ax.set_xlabel("discovery rate (recall)")
     ax.set_ylabel("truth-content (precision)")

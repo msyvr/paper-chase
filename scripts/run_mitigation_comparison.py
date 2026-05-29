@@ -172,10 +172,6 @@ def main() -> None:
         f"ρ = {RHO}, n_contexts = {N_CONTEXTS}, novelty-weight sweep, "
         f"{N_SEEDS} seeds/point"
     )
-    # plot_pareto_plane only draws the legend when mark_ideal=True (its first
-    # call), so after multiple overlay calls we need to redraw to pick up the
-    # labels for every trajectory.
-    ax.legend(loc="lower left")
     fig.tight_layout()
 
     fig_path = run_dir / "mitigation_comparison.png"
