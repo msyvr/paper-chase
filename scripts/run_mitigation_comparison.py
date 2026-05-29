@@ -40,40 +40,62 @@ from paper_chase.results_io import (
 
 # ---- Sweep parameters ----
 NOVELTY_WEIGHTS = [1.0, 2.0, 5.0, 10.0, 20.0, 50.0]
-N_SEEDS = 3
+N_SEEDS = 10
 REPLICATION_WEIGHT = 1.0
 EFFORT_COST_PER_SAMPLE = 0.02
 RHO = 0.5                # moderate correlated errors — where invariance should start to matter
-N_CONTEXTS = 4           # gives invariance room (with k_contexts = 2)
+N_CONTEXTS = 4           # gives invariance room (k up to 4 = must hit every context)
+N_HYPOTHESES = 10_000    # 10x the default so the action budget can't saturate recall;
+                         # matches the realistic "vast hypothesis space, scarce attention"
+                         # regime. With ~2.25 novel studies per hypothesis (uniform
+                         # selection over 22,500 novel actions / 10,000 H), `none`
+                         # recall lands around 0.75 — a "moderately-studied effects"
+                         # regime where the replication-crisis dynamic is the
+                         # interpretable feature.
+N_STEPS = 500            # SimConfig default. Deliberately kept here rather than
+                         # bumped: under uniform hypothesis selection, raising
+                         # n_steps re-saturates `none` recall at ~1.0 (the very
+                         # artifact we're avoiding). The regime where high-k
+                         # invariance can function while `none` recall stays
+                         # diagnostic requires non-uniform attention (power-law
+                         # selection over hypotheses), tracked in FUTURE_WORK.md.
 
 
 # Mitigation factories — fresh instances per sim because some mitigations are
 # stateful (e.g., InvarianceRequirement maintains a per-hypothesis evidence
 # buffer that must reset between independent runs).
+#
+# Pre-registration is modeled as *leaky* (qrp_cap=0.1) — perfect enforcement
+# (qrp_cap=0.0) isn't realistic and would only show an upper bound; we want a
+# fair comparison against output-side filters. Invariance is swept over its
+# strictness parameter k ∈ {2, 3, 4} since k=2 is the weakest setting and the
+# project's deeper claim is that higher k dominates under correlated errors.
 MITIGATION_FACTORIES = {
-    "none":                      lambda: [],
-    "pre-registration":          lambda: [PreRegistration(qrp_cap=0.0)],
-    "replication+retraction":    lambda: [ReplicationAndRetraction(audit_fraction=0.1)],
-    "invariance (k=2)":          lambda: [InvarianceRequirement(k_contexts=2)],
-    "all-on":                    lambda: [
-        PreRegistration(qrp_cap=0.0),
+    "none":                          lambda: [],
+    "pre-registration (leaky)":      lambda: [PreRegistration(qrp_cap=0.1)],
+    "replication+retraction":        lambda: [ReplicationAndRetraction(audit_fraction=0.1)],
+    "invariance (k=2)":              lambda: [InvarianceRequirement(k_contexts=2)],
+    "invariance (k=3)":              lambda: [InvarianceRequirement(k_contexts=3)],
+    "invariance (k=4)":              lambda: [InvarianceRequirement(k_contexts=4)],
+    "all-on":                        lambda: [
+        PreRegistration(qrp_cap=0.1),
         ReplicationAndRetraction(audit_fraction=0.1),
-        InvarianceRequirement(k_contexts=2),
+        InvarianceRequirement(k_contexts=3),
     ],
 }
 
 
 def main() -> None:
-    params = f"nw{NOVELTY_WEIGHTS[0]:g}-{NOVELTY_WEIGHTS[-1]:g}_seeds{N_SEEDS}_rho{RHO}_nctx{N_CONTEXTS}"
+    params = f"nw{NOVELTY_WEIGHTS[0]:g}-{NOVELTY_WEIGHTS[-1]:g}_seeds{N_SEEDS}_rho{RHO}_nctx{N_CONTEXTS}_nh{N_HYPOTHESES}_nsteps{N_STEPS}"
     run_dir = make_run_dir(experiment="mitigation_comparison", params=params)
     print(f"Run dir: {run_dir}")
 
-    base_world = WorldConfig(n_contexts=N_CONTEXTS, seed=0)
+    base_world = WorldConfig(n_hypotheses=N_HYPOTHESES, n_contexts=N_CONTEXTS, seed=0)
     base_study = StudyConfig(correlated_error_rho=RHO)
 
     save_config_json(
         run_dir / "config.json",
-        base_cfg=SimConfig(world=base_world, study=base_study),
+        base_cfg=SimConfig(world=base_world, study=base_study, n_steps=N_STEPS),
         sweep={
             "mitigations": list(MITIGATION_FACTORIES.keys()),
             "novelty_weights": list(NOVELTY_WEIGHTS),
@@ -82,10 +104,15 @@ def main() -> None:
             "fixed_effort_cost_per_sample": EFFORT_COST_PER_SAMPLE,
             "rho": RHO,
             "n_contexts": N_CONTEXTS,
+            "n_hypotheses": N_HYPOTHESES,
+            "n_steps": N_STEPS,
             "mitigation_parameters": {
-                "pre-registration":       "PreRegistration(qrp_cap=0.0)",
-                "replication+retraction": "ReplicationAndRetraction(audit_fraction=0.1)",
-                "invariance (k=2)":       "InvarianceRequirement(k_contexts=2)",
+                "pre-registration (leaky)": "PreRegistration(qrp_cap=0.1)",
+                "replication+retraction":   "ReplicationAndRetraction(audit_fraction=0.1)",
+                "invariance (k=2)":         "InvarianceRequirement(k_contexts=2)",
+                "invariance (k=3)":         "InvarianceRequirement(k_contexts=3)",
+                "invariance (k=4)":         "InvarianceRequirement(k_contexts=4)",
+                "all-on":                   "PreRegistration(qrp_cap=0.1) + ReplicationAndRetraction(audit_fraction=0.1) + InvarianceRequirement(k_contexts=3)",
             },
         },
         git_state=capture_git_state(),
@@ -112,6 +139,7 @@ def main() -> None:
                         replication_weight=REPLICATION_WEIGHT,
                         effort_cost_per_sample=EFFORT_COST_PER_SAMPLE,
                     ),
+                    n_steps=N_STEPS,
                     seed=seed,
                 )
                 result = run(cfg, mitigations=factory())

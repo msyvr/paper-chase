@@ -34,40 +34,71 @@ simplest configuration, licensing the work to proceed to mitigations.
 ## Phase 1.C — Mitigation comparison (Pareto plane)
 
 **What was run.** Sweep of the novelty:replication reward ratio across
-{1, 2, 5, 10, 20, 50} × {no mitigation, pre-registration,
-replication+retraction, invariance (k=2), all-on}; 3 seeds per condition.
-Correlated errors active at ρ = 0.5 (moderate); n_contexts = 4 to give
-the invariance mitigation room to operate.
+{1, 2, 5, 10, 20, 50} × {no mitigation, pre-registration (leaky, qrp_cap=0.1),
+replication+retraction, invariance (k=2), invariance (k=3), invariance (k=4),
+all-on}; 10 seeds per condition. Correlated errors active at ρ = 0.5
+(moderate). The hypothesis space is sized to represent the realistic
+"vast hypothesis space, scarce attention" regime: `n_hypotheses = 10,000`
+against ~22,500 novel actions over the run gives ~2.25 studies per
+hypothesis under uniform random selection — most plausible hypotheses go
+unstudied, recall stays meaningfully below 1.0 even without any mitigation.
+`n_contexts = 4` so k = 4 is the strictest possible invariance bar (finding
+must appear in every context). Pre-registration is modeled as *leaky*:
+qrp_cap = 0.1 allows residual analytic flexibility, since perfect enforcement
+is unrealistic and would only set an upper bound.
 Script: [`scripts/run_mitigation_comparison.py`](../scripts/run_mitigation_comparison.py).
 
 **Result.**
 
 ![Phase 1.C mitigation comparison](images/phase-1c-mitigation-comparison.png)
 
-**Interpretation.** Three mitigations sit on the Pareto frontier, each with a
-different precision–recall trade-off:
+**Interpretation.** A multi-mitigation Pareto frontier emerges, traced by
+both the leaky pre-reg / `none` cluster on the high-recall end and the
+invariance strictness gradient (k = 2 → 3 → 4) on the high-precision end:
 
-- **Pre-registration** (precision ≈ 0.70, recall ≈ 0.99, *flat across pressure*) —
-  kills QRP at the source, so incentive pressure no longer matters; the
-  trajectory collapses to a single point. Best when high recall matters.
-- **Replication + retraction** (precision ≈ 0.94, recall ≈ 0.70) — audit-and-prune
-  trims false positives aggressively but at recall cost.
-- **All-on** (precision ≈ 0.99, recall ≈ 0.54) — also pressure-invariant for the
-  same reason as pre-reg; precision approaches the ceiling but recall takes a
-  further hit from the audit on top of the pre-reg recall loss.
+| Mitigation | Precision range | Recall range | Position |
+|---|---|---|---|
+| `none` | 0.39–0.50 | 0.73–0.77 | Baseline; QRP-driven precision loss with novelty pressure |
+| `pre-reg (leaky)` | ≈ 0.57 | ≈ 0.71 | Pareto-dominates `none` (mild gain in both axes) |
+| `invariance (k=2)` | 0.82–0.91 | 0.36–0.40 | **On the frontier** — trades recall for precision |
+| `replication+retraction` | 0.94–0.96 | ≈ 0.25 | **On the frontier** — audit retracts many TPs given sparse confirming evidence |
+| `invariance (k=3)` | 0.98–0.99 | 0.10–0.12 | **On the frontier** — high precision, low recall |
+| `invariance (k=4)` | ≈ 1.00 | ≈ 0.02 | Extreme: publishes almost nothing |
+| `all-on` | ≈ 1.00 | ≈ 0.04 | Collapses to k=4-like behavior (strictest filter dominates) |
 
-Two mitigations are Pareto-*dominated* at this ρ:
+**Headline finding: there is no single "best" mitigation; the frontier is
+populated by multiple mitigations at different trade-off points.** Pre-reg
+gives the most recall-preserving gain. Invariance k=2 buys a large precision
+jump for moderate recall cost. Replication+retraction and invariance k=3 sit
+between, with invariance k=3 slightly higher in precision. Choice depends on
+which end of the frontier matters in deployment.
 
-- **No mitigation** (precision 0.35–0.47, recall ≈ 1.0) — every mitigation beats it.
-- **Invariance (k = 2)** alone (precision 0.49–0.66, recall ≈ 0.99) — improves
-  modestly over no mitigation but doesn't outperform pre-registration. At
-  ρ = 0.5, k = 2 is evidently not strict enough to consistently break through
-  correlated-error false positives. The project's deeper claim — *invariance
-  dominates replication-style mitigations under sufficiently strong correlated
-  errors* — is regime-specific and warrants the **ρ-sweep planned for Phase 1.D**:
-  if invariance's advantage exists it should emerge at higher ρ and/or higher k.
+**Why `none` recall lands at ~0.75, not 1.0**: per-study power under default
+config (effect size d ≈ 0.4, n = 30 samples, α = 0.05) is ~0.71 without QRP
+and ~0.90 with moderate QRP. With ~2.25 studies per H, recall ≈ 1 −
+exp(−2.25 × effective_power) ≈ 0.75–0.80. ρ = 0.5 correlated errors reduce
+effective independent power slightly. This is the model's honest output for
+"moderately-studied effects in a vast hypothesis space" — the regime where
+the replication-crisis dynamic is interpretable.
 
-Note that **all-on does not strictly dominate every single mitigation** —
-mechanistically real: pre-reg eliminates the pressure dynamic by killing QRP,
-so adding the replication audit on top starts retracting true positives that
-just-barely cleared α, which costs recall.
+**Why high-k invariance publishes so little**: with ~2.25 studies per H and
+uniform context sampling over 4 contexts, the expected number of distinct
+contexts hit per H is 4 × (1 − (3/4)^2.25) ≈ 1.85. So k = 2 catches ~38% of
+true H, k = 3 catches ~11%, k = 4 catches ~2%. **This is a real finding, not
+an artifact: strict invariance is data-hungry.** The regime where high-k
+invariance shines is one where attention concentrates on a subset of
+hypotheses — i.e., real scientific practice, where well-studied topics
+accumulate evidence across many labs/contexts while the long tail goes
+unstudied. The non-uniform-selection upgrade that would model this is
+tracked in [FUTURE_WORK.md](../FUTURE_WORK.md).
+
+**Why `all-on` collapses to k=4-like behavior**: the strictest filter in the
+stack dominates. Once k = 3 invariance is in place, it gates publication so
+strictly that adding pre-reg and audit changes little.
+
+**Phase 1.D — ρ-sweep** will trace how the frontier shifts as correlated
+errors strengthen. The most actionable comparisons are likely at the
+moderately-strict end (pre-reg leaky, invariance k=2, replication+retraction)
+where every mitigation has visible recall and precision both. If invariance's
+advantage over audit-style mitigations is real, it should sharpen at higher ρ
+where shared shocks defeat single-context replication.

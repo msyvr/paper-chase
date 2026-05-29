@@ -30,6 +30,34 @@ parameter ∈ [0, 1] would model adoption dynamics: a field where pre-registrati
 is partial. Useful for governance questions like *what fraction of pre-reg
 adoption is needed to recover most of the benefit?*
 
+### Non-uniform hypothesis selection (power-law attention)
+
+`ParametricAgent.choose_action` currently picks `target_id` uniformly at random
+over `range(world.n_hypotheses)`. Real scientific attention is heavily skewed —
+a few hypotheses are studied across many labs/contexts (heavily-replicated
+"important" results), while the long tail goes unstudied. With uniform
+selection, the invariance mitigations at higher k cannot function under
+realistic hypothesis-space-to-action-budget ratios: most true hypotheses simply
+don't accumulate enough multi-context evidence.
+
+A power-law (Zipf-style) selection weight over hypotheses would model this
+realistically: a subset of H receives heavy multi-study coverage (where
+invariance can work), while most receive 0–1 studies (where it cannot). The
+expected finding: invariance gives high precision *on the well-studied
+fraction* of the literature while leaving the long tail unfiltered — a more
+honest picture than the uniform-selection result.
+
+Scaffolding shape: a `selection_weight: str = "uniform" | "zipf"` parameter on
+`AgentConfig` (or a callable for general weighting). One-line dispatch in
+`choose_action`; everything else unchanged. Pair with a similar refit of
+`p_replicate` weighting to bias replications toward already-published findings
+(which is what happens in real meta-science).
+
+This was flagged during Phase 1.C analysis: at `n_hypotheses=10000` with
+`n_steps=1500`, invariance k≥3 has enough data to function but the comparison
+remains artificially flat across hypotheses. Non-uniform selection is the
+realism upgrade that makes the regime question disappear.
+
 ---
 
 ## Within the invariance branch (Phase 1, third mitigation)
