@@ -110,7 +110,7 @@ class SimConfig:
     incentive: IncentiveConfig = field(default_factory=IncentiveConfig)
     n_steps: int = 500
     seed: int = 0
-    snapshot_every: int = 10             # record summary every N steps
+    snapshot_every: int = 1              # record summary every N steps (default 1 = full resolution)
 
     def __post_init__(self) -> None:
         if self.n_steps <= 0:
