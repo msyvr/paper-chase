@@ -47,8 +47,9 @@ mitigations.
 **What was run.** Sweep of the novelty:replication reward ratio across
 {1, 2, 5, 10, 20, 50} × {no mitigation, pre-registration (leaky, qrp_cap=0.1),
 replication+retraction, invariance (k=2), invariance (k=3), invariance (k=4),
-all-on}; 10 seeds per condition. Correlated errors active at ρ = 0.5
-(moderate). The hypothesis space is sized to represent the realistic
+all-on}; 10 seeds per condition. Systematic-bias active at
+`bias_strength = 0.5` (moderate — per-(h, ctx) bias SD = 0.5 vs. unit-variance
+sampling noise). The hypothesis space is sized to represent the realistic
 "vast hypothesis space, scarce attention" regime: `n_hypotheses = 10,000`
 against ~22,500 novel actions over the run gives ~2.25 studies per
 hypothesis under uniform random selection — most plausible hypotheses go
@@ -58,6 +59,19 @@ must appear in every context). Pre-registration is modeled as *leaky*:
 qrp_cap = 0.1 allows residual analytic flexibility, since perfect enforcement
 is unrealistic and would only set an upper bound.
 Script: [`scripts/run_mitigation_comparison.py`](../scripts/run_mitigation_comparison.py).
+
+> **Note on the noise model.** This run uses the corrected additive-bias
+> noise model: `Z = δ + bias + private` with `bias ~ N(0, bias_strength²)`
+> per (h, ctx) and `private ~ N(0, 1)` per study, both independent and
+> additive. An earlier version used a Gaussian-copula formulation
+> (`Z = δ + ρ·shared + sqrt(1-ρ²)·private`) which preserved total per-study
+> variance at 1 by trading private noise for shared noise as ρ rose. That
+> formulation artificially shrank audit-replicate noise at high ρ, giving
+> the same-base-model audit (`ReplicationAndRetraction`) an unrealistic
+> advantage. The qualitative Pareto-frontier shape below is unchanged from
+> the prior run, but absolute precision numbers are 5–10 percentage points
+> lower because the corrected model has higher total noise (Var(Z) under H0
+> = 1 + bias_strength² = 1.25, not 1).
 
 **Result.**
 
@@ -69,12 +83,12 @@ invariance strictness gradient (k = 2 → 3 → 4) on the high-precision end:
 
 | Mitigation | Precision range | Recall range | Position |
 |---|---|---|---|
-| `none` | 0.39–0.50 | 0.73–0.77 | Baseline; QRP-driven precision loss with novelty pressure |
-| `pre-reg (leaky)` | ≈ 0.57 | ≈ 0.71 | Pareto-dominates `none` (mild gain in both axes) |
-| `invariance (k=2)` | 0.82–0.91 | 0.36–0.40 | **On the frontier** — trades recall for precision |
-| `replication+retraction` | 0.94–0.96 | ≈ 0.25 | **On the frontier** — audit retracts many TPs given sparse confirming evidence |
-| `invariance (k=3)` | 0.98–0.99 | 0.10–0.12 | **On the frontier** — high precision, low recall |
-| `invariance (k=4)` | ≈ 1.00 | ≈ 0.02 | Extreme: publishes almost nothing |
+| `none` | 0.31–0.40 | 0.74–0.77 | Baseline; QRP-driven precision loss with novelty pressure |
+| `pre-reg (leaky)` | ≈ 0.45 | ≈ 0.72 | Pareto-dominates `none` (mild gain in both axes) |
+| `invariance (k=2)` | 0.71–0.84 | 0.36–0.39 | **On the frontier** — trades recall for precision |
+| `replication+retraction` | 0.91–0.94 | ≈ 0.21 | **On the frontier** — audit retracts many TPs given sparse confirming evidence |
+| `invariance (k=3)` | 0.97–0.99 | 0.10–0.11 | **On the frontier** — high precision, low recall |
+| `invariance (k=4)` | ≈ 1.00 | ≈ 0.01 | Extreme: publishes almost nothing |
 | `all-on` | ≈ 1.00 | ≈ 0.04 | Collapses to k=4-like behavior (strictest filter dominates) |
 
 **Headline finding: there is no single "best" mitigation; the frontier is
@@ -87,15 +101,17 @@ which end of the frontier matters in deployment.
 **Why `none` recall lands at ~0.75, not 1.0**: per-study power under default
 config (effect size d ≈ 0.4, n = 30 samples, α = 0.05) is ~0.71 without QRP
 and ~0.90 with moderate QRP. With ~2.25 studies per H, recall ≈ 1 −
-exp(−2.25 × effective_power) ≈ 0.75–0.80. ρ = 0.5 correlated errors reduce
-effective independent power slightly. This is the model's honest output for
-"moderately-studied effects in a vast hypothesis space" — the regime where
-the replication-crisis dynamic is interpretable.
+exp(−2.25 × effective_power) ≈ 0.75–0.80. Systematic bias at `bias_strength`
+= 0.5 doesn't reduce per-study power directly — it just inflates the
+average false-positive rate by adding a per-(h, ctx) offset to Z. This is
+the model's honest output for "moderately-studied effects in a vast
+hypothesis space" — the regime where the replication-crisis dynamic is
+interpretable.
 
 **Why high-k invariance publishes so little**: with ~2.25 studies per H and
 uniform context sampling over 4 contexts, the expected number of distinct
 contexts hit per H is 4 × (1 − (3/4)^2.25) ≈ 1.85. So k = 2 catches ~38% of
-true H, k = 3 catches ~11%, k = 4 catches ~2%. **This is a real finding, not
+true H, k = 3 catches ~11%, k = 4 catches ~1%. **This is a real finding, not
 an artifact: strict invariance is data-hungry.** The regime where high-k
 invariance shines is one where attention concentrates on a subset of
 hypotheses — i.e., real scientific practice, where well-studied topics
@@ -107,9 +123,10 @@ tracked in [FUTURE_WORK.md](../FUTURE_WORK.md).
 stack dominates. Once k = 3 invariance is in place, it gates publication so
 strictly that adding pre-reg and audit changes little.
 
-**Phase 1.D — ρ-sweep** will trace how the frontier shifts as correlated
-errors strengthen. The most actionable comparisons are likely at the
-moderately-strict end (pre-reg leaky, invariance k=2, replication+retraction)
-where every mitigation has visible recall and precision both. If invariance's
-advantage over audit-style mitigations is real, it should sharpen at higher ρ
-where shared shocks defeat single-context replication.
+**Phase 1.D — bias-strength sweep** will trace how the frontier shifts as
+systematic bias strengthens. The most actionable comparisons are likely at
+the moderately-strict end (pre-reg leaky, invariance k=2,
+replication+retraction) where every mitigation has visible recall and
+precision. If invariance's advantage over audit-style mitigations is real,
+it should sharpen at higher `bias_strength` where same-base-model audits can
+no longer break correlated false positives via fresh sampling noise.
