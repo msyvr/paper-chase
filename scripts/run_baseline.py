@@ -24,7 +24,7 @@ from __future__ import annotations
 import numpy as np
 import matplotlib.pyplot as plt
 
-from paper_chase.config import SimConfig, IncentiveConfig
+from paper_chase.config import SimConfig, IncentiveConfig, WorldConfig
 from paper_chase.simulation import run
 from paper_chase.plots import plot_metrics_vs_pressure, plot_pareto_plane
 from paper_chase.results_io import (
@@ -35,26 +35,35 @@ from paper_chase.results_io import (
 # Sweep the novelty reward, holding replication weight at 1.0. The ratio is the
 # "incentive pressure" axis: higher = stronger publish-or-perish.
 NOVELTY_WEIGHTS = [1.0, 2.0, 5.0, 10.0, 20.0, 50.0]
-N_SEEDS = 3                            # repeat each setting for sampling-variance control
+N_SEEDS = 10                           # repeat each setting for sampling-variance control
 REPLICATION_WEIGHT = 1.0
 EFFORT_COST_PER_SAMPLE = 0.02
+N_HYPOTHESES = 10_000                  # match Phase 1+ regime: a "vast hypothesis
+                                       # space, scarce attention" world where recall
+                                       # is not saturated — same parameter choice as
+                                       # the mitigation comparison, so the baseline
+                                       # → mitigations narrative reads as one
+                                       # continuous experiment.
 
 
 def main() -> None:
     # Per-run output directory.
-    params = f"nw{NOVELTY_WEIGHTS[0]:g}-{NOVELTY_WEIGHTS[-1]:g}_seeds{N_SEEDS}"
+    params = f"nw{NOVELTY_WEIGHTS[0]:g}-{NOVELTY_WEIGHTS[-1]:g}_seeds{N_SEEDS}_nh{N_HYPOTHESES}"
     run_dir = make_run_dir(experiment="baseline", params=params)
     print(f"Run dir: {run_dir}")
+
+    base_world = WorldConfig(n_hypotheses=N_HYPOTHESES, seed=0)
 
     # Save the full reproducibility record up front (config + sweep spec + git state).
     save_config_json(
         run_dir / "config.json",
-        base_cfg=SimConfig(),
+        base_cfg=SimConfig(world=base_world),
         sweep={
             "novelty_weights": list(NOVELTY_WEIGHTS),
             "n_seeds": N_SEEDS,
             "fixed_replication_weight": REPLICATION_WEIGHT,
             "fixed_effort_cost_per_sample": EFFORT_COST_PER_SAMPLE,
+            "n_hypotheses": N_HYPOTHESES,
         },
         git_state=capture_git_state(),
     )
@@ -68,6 +77,7 @@ def main() -> None:
         tcs, drs = [], []
         for seed in range(N_SEEDS):
             cfg = SimConfig(
+                world=base_world,
                 incentive=IncentiveConfig(
                     novel_weight=nw,
                     replication_weight=REPLICATION_WEIGHT,
@@ -110,6 +120,7 @@ def main() -> None:
         truth_means, truth_sds, discovery_means, discovery_sds,
         colorby=NOVELTY_WEIGHTS,
         colorby_label="rewards: novel/replicate",
+        mark_ideal=True,
         ax=ax_pareto,
     )
     fig.suptitle(

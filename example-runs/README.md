@@ -9,25 +9,36 @@ versions. This is the public face of "what running this produces right now."
 ## Phase 0 — Validity gate
 
 **What was run.** Sweep of the novelty:replication reward ratio across
-{1, 2, 5, 10, 20, 50}, holding replication weight at 1.0; 3 seeds per
+{1, 2, 5, 10, 20, 50}, holding replication weight at 1.0; 10 seeds per
 condition. No mitigations, no correlated errors, parametric agents only.
+`n_hypotheses = 10,000` — the "vast hypothesis space, scarce attention"
+regime used throughout Phase 1+, so the baseline → mitigations narrative
+reads as one continuous experiment.
 Script: [`scripts/run_baseline.py`](../scripts/run_baseline.py).
 
 **Result.**
 
 ![Phase 0 validity gate](images/phase-0-validity-gate.png)
 
-**Interpretation.** Truth-content (precision) falls as the novelty:replication
-ratio rises — the qualitative replication-crisis dynamic the model is meant to
-reproduce. Discovery rate (recall) stays saturated near 1.0: with 50 agents
-over 500 steps, every true hypothesis gets studied enough times that at least
-one significant result lands eventually, so the standing literature catches
-them all. The Pareto-plane trajectory drifts from the upper-right toward the
-lower-right as pressure increases — same data, the precision–recall trade-off
+**Interpretation.** Truth-content (precision) falls from 0.50 (low pressure)
+to 0.39 (high pressure) as the novelty:replication ratio rises — the
+qualitative replication-crisis dynamic the model is meant to reproduce.
+Discovery rate (recall) sits in 0.73–0.77 across all conditions: with
+~22,500 novel actions spread over 10,000 hypotheses, the expected ~2.25
+studies per hypothesis is enough to detect most true effects at the
+configured per-study power (~0.71 without QRP, ~0.90 with moderate QRP) but
+not all of them. Recall rises very slightly with pressure because QRP
+inflates effective α and so raises true-positive detection alongside
+false-positive rate.
+
+The Pareto-plane trajectory (right panel) drifts from upper-position
+(low-pressure, dark) toward lower-position (high-pressure, yellow) at
+roughly constant recall — same data, the precision–recall trade-off
 visualised directly.
 
-Validity gate passed: the engine produces the known phenomenon under the
-simplest configuration, licensing the work to proceed to mitigations.
+Validity gate passed: the engine produces the known precision-decline
+phenomenon at non-saturating recall, licensing the work to proceed to
+mitigations.
 
 ---
 
