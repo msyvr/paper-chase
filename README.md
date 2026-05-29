@@ -18,6 +18,8 @@ Builds on Smaldino & McElreath, _[The natural selection of bad science](https://
 
 ## Status
 
+For recent results, see [example runs](example-runs/README.md).
+
 Validity gate implemented
 
 - With no mitigation, the literature's truth-content falls
@@ -47,7 +49,7 @@ uv run python scripts/run_baseline.py  # produces results/validity_gate.png
 
 ## Acknowledgments
 
-The framing — replication crisis in *automated* science as a problem worth
+The framing — replication crisis in _automated_ science as a problem worth
 stress-testing via simulation of mitigations — is from one of the project
 bullets on Konstantinos Voudouris's
 [Pivotal mentor profile](https://www.pivotal-research.org/mentors#konstantinos-voudouris).

@@ -1,6 +1,6 @@
-# example-runs
+# Example runs
 
-Each section is the **latest** result from running the relevant phase's script.
+Each section is the most recent result from running the relevant phase's script.
 Re-runs overwrite the entry and image in place; git history preserves prior
 versions. This is the public face of "what running this produces right now."
 
@@ -45,7 +45,7 @@ mitigations.
 ## Phase 1.C — Mitigation comparison (Pareto plane)
 
 **What was run.** Sweep of the novelty:replication reward ratio across
-{1, 2, 5, 10, 20, 50} × {no mitigation, pre-registration (leaky, qrp_cap=0.1),
+{1, 2, 5, 10, 20, 50} × {no mitigation, pre-registration (leaky, qrp*cap=0.1),
 replication+retraction, invariance (k=2), invariance (k=3), invariance (k=4),
 all-on}; 10 seeds per condition. Systematic-bias active at
 `bias_strength = 0.5` (moderate — per-(h, ctx) bias SD = 0.5 vs. unit-variance
@@ -55,7 +55,7 @@ against ~22,500 novel actions over the run gives ~2.25 studies per
 hypothesis under uniform random selection — most plausible hypotheses go
 unstudied, recall stays meaningfully below 1.0 even without any mitigation.
 `n_contexts = 4` so k = 4 is the strictest possible invariance bar (finding
-must appear in every context). Pre-registration is modeled as *leaky*:
+must appear in every context). Pre-registration is modeled as \_leaky*:
 qrp_cap = 0.1 allows residual analytic flexibility, since perfect enforcement
 is unrealistic and would only set an upper bound.
 Script: [`scripts/run_mitigation_comparison.py`](../scripts/run_mitigation_comparison.py).
@@ -81,15 +81,15 @@ Script: [`scripts/run_mitigation_comparison.py`](../scripts/run_mitigation_compa
 both the leaky pre-reg / `none` cluster on the high-recall end and the
 invariance strictness gradient (k = 2 → 3 → 4) on the high-precision end:
 
-| Mitigation | Precision range | Recall range | Position |
-|---|---|---|---|
-| `none` | 0.31–0.40 | 0.74–0.77 | Baseline; QRP-driven precision loss with novelty pressure |
-| `pre-reg (leaky)` | ≈ 0.45 | ≈ 0.72 | Pareto-dominates `none` (mild gain in both axes) |
-| `invariance (k=2)` | 0.71–0.84 | 0.36–0.39 | **On the frontier** — trades recall for precision |
-| `replication+retraction` | 0.91–0.94 | ≈ 0.21 | **On the frontier** — audit retracts many TPs given sparse confirming evidence |
-| `invariance (k=3)` | 0.97–0.99 | 0.10–0.11 | **On the frontier** — high precision, low recall |
-| `invariance (k=4)` | ≈ 1.00 | ≈ 0.01 | Extreme: publishes almost nothing |
-| `all-on` | ≈ 1.00 | ≈ 0.04 | Collapses to k=4-like behavior (strictest filter dominates) |
+| Mitigation               | Precision range | Recall range | Position                                                                       |
+| ------------------------ | --------------- | ------------ | ------------------------------------------------------------------------------ |
+| `none`                   | 0.31–0.40       | 0.74–0.77    | Baseline; QRP-driven precision loss with novelty pressure                      |
+| `pre-reg (leaky)`        | ≈ 0.45          | ≈ 0.72       | Pareto-dominates `none` (mild gain in both axes)                               |
+| `invariance (k=2)`       | 0.71–0.84       | 0.36–0.39    | **On the frontier** — trades recall for precision                              |
+| `replication+retraction` | 0.91–0.94       | ≈ 0.21       | **On the frontier** — audit retracts many TPs given sparse confirming evidence |
+| `invariance (k=3)`       | 0.97–0.99       | 0.10–0.11    | **On the frontier** — high precision, low recall                               |
+| `invariance (k=4)`       | ≈ 1.00          | ≈ 0.01       | Extreme: publishes almost nothing                                              |
+| `all-on`                 | ≈ 1.00          | ≈ 0.04       | Collapses to k=4-like behavior (strictest filter dominates)                    |
 
 **Headline finding: there is no single "best" mitigation; the frontier is
 populated by multiple mitigations at different trade-off points.** Pre-reg
@@ -102,9 +102,9 @@ which end of the frontier matters in deployment.
 config (effect size d ≈ 0.4, n = 30 samples, α = 0.05) is ~0.71 without QRP
 and ~0.90 with moderate QRP. With ~2.25 studies per H, recall ≈ 1 −
 exp(−2.25 × effective_power) ≈ 0.75–0.80. Systematic bias at `bias_strength`
-= 0.5 doesn't reduce per-study power directly — it just inflates the
-average false-positive rate by adding a per-(h, ctx) offset to Z. This is
-the model's honest output for "moderately-studied effects in a vast
+= 0.5 doesn't reduce per-study power directly; rather, it inflates the
+average false-positive rate by adding a per-(h, ctx) offset to Z. This
+represents the model's output for "moderately-studied effects in a vast
 hypothesis space" — the regime where the replication-crisis dynamic is
 interpretable.
 
@@ -142,8 +142,8 @@ between same-(h, ctx) studies = bias_strength² / (1+bias_strength²), so
 bs=2 → 0.80, bs=5 → 0.96 — the "same-LLM near-deterministic" regime).
 Script: [`scripts/run_bias_sensitivity.py`](../scripts/run_bias_sensitivity.py).
 
-**The claim Phase 1.D is positioned to test.** *Invariance-style mitigations
-dominate audit-style ones under sufficiently strong systematic bias.*
+**The claim Phase 1.D is positioned to test.** _Invariance-style mitigations
+dominate audit-style ones under sufficiently strong systematic bias._
 Mechanism: same-base audits inherit the per-(h, ctx) bias that drove the
 original significance, so a lucky-bias FP gets confirmed by audit;
 invariance requires findings across distinct contexts, each with an
@@ -153,14 +153,14 @@ independent bias draw, so a single lucky bias cannot carry an FP through.
 
 ![Phase 1.D bias sensitivity](images/phase-1d-bias-sensitivity.png)
 
-| Mitigation | bs=0 | bs=0.5 | bs=1 | bs=2 | bs=5 |
-|---|---|---|---|---|---|
-| `none` | 0.41 / 0.77 | 0.33 / 0.77 | 0.22 / 0.76 | 0.14 / 0.77 | 0.11 / 0.83 |
-| `pre-reg (leaky)` | 0.57 / 0.72 | 0.45 / 0.71 | 0.28 / 0.72 | 0.15 / 0.73 | 0.11 / 0.81 |
+| Mitigation               | bs=0        | bs=0.5      | bs=1        | bs=2            | bs=5        |
+| ------------------------ | ----------- | ----------- | ----------- | --------------- | ----------- |
+| `none`                   | 0.41 / 0.77 | 0.33 / 0.77 | 0.22 / 0.76 | 0.14 / 0.77     | 0.11 / 0.83 |
+| `pre-reg (leaky)`        | 0.57 / 0.72 | 0.45 / 0.71 | 0.28 / 0.72 | 0.15 / 0.73     | 0.11 / 0.81 |
 | `replication+retraction` | 0.93 / 0.19 | 0.91 / 0.22 | 0.82 / 0.27 | **0.30 / 0.39** | 0.11 / 0.64 |
-| `invariance (k=2)` | 0.82 / 0.40 | 0.73 / 0.38 | 0.47 / 0.37 | 0.17 / 0.37 | 0.11 / 0.44 |
+| `invariance (k=2)`       | 0.82 / 0.40 | 0.73 / 0.38 | 0.47 / 0.37 | 0.17 / 0.37     | 0.11 / 0.44 |
 
-*(precision / recall, bold marks the R+R cliff)*
+_(precision / recall, bold marks the R+R cliff)_
 
 **Where the data points.** Two distinct dynamics show up across the
 extended range, neither of which is the predicted invariance-overtakes-R+R
@@ -184,11 +184,11 @@ crossover:
 3. **At extreme bias (bs=5), all mitigations converge to the `none`
    precision floor (~0.11)**, but only `none` preserves recall (0.83 vs.
    R+R 0.64 vs. invariance 0.44). At this regime, `none` actually
-   Pareto-dominates all the mitigations — *they buy nothing at the cost of
-   recall*.
+   Pareto-dominates all the mitigations — _they buy nothing at the cost of
+   recall_.
 
 **k=2 invariance is not the version of the claim that matters here** — the
-natural next test is *strict* invariance (k → n_contexts) under a regime
+natural next test is _strict_ invariance (k → n_contexts) under a regime
 where it has the data to function. That test isn't possible under the
 current uniform-attention model: at ~2.25 studies/H, k=3 catches ~11% of
 true H and k=4 catches ~2% — too few findings to compare meaningfully
@@ -205,7 +205,7 @@ prediction is geometrically tied to k, and k=2 is structurally the weakest
 version of the test.
 
 **Why R+R holds up at moderate bias but breaks at high bias**: audit
-replicates draw *fresh* private noise (the variance-fix). At low-moderate
+replicates draw _fresh_ private noise (the variance-fix). At low-moderate
 bias (bs ≤ 1), most FPs are "lucky-by-bias-AND-private together" — bias
 alone is rarely big enough to clear z_crit on its own (z_crit ≈ 1.96; at
 bs=1.0, P(|bias| > z_crit) ≈ 5%), so audit's fresh private noise breaks
@@ -217,11 +217,11 @@ and bs=2 corresponds to this transition.
 
 **Where this points next**:
 
-1. **Phase 2 — non-uniform hypothesis selection** (FUTURE_WORK.md). The
+1. **Phase 2 — non-uniform hypothesis selection** (FUTURE*WORK.md). The
    prerequisite for testing high-k invariance. Under power-law attention,
    heavily-studied H accumulate the multi-context coverage that lets k=3,
    k=4 invariance actually filter; the long tail keeps `none` recall
-   meaningful. This unlocks the *real* invariance vs. R+R comparison at
+   meaningful. This unlocks the \_real* invariance vs. R+R comparison at
    the regime (bs ≥ 2) where R+R has just been shown to break.
 
 2. **Phase 2.B — cross-base audit comparison**. A small extension to
@@ -245,21 +245,21 @@ and bs=2 corresponds to this transition.
    `audit_sample_size`, `k_contexts` × `n_contexts` joint sweeps — to map
    the parameter space rather than test single points.
 
-**One observation to carry forward**: pre-registration (leaky) does *not*
+**One observation to carry forward**: pre-registration (leaky) does _not_
 defend against bias-driven FPs in this model — its trajectory falls in
 parallel with `none`, just shifted up by the QRP-clamp's effect. Pre-reg
 addresses one source of inflated significance (QRP); bias is a separate
 source; pre-reg doesn't touch it. This suggests a useful refinement to the
-mitigation taxonomy: distinguish *source-of-error* mitigations (pre-reg ↔
+mitigation taxonomy: distinguish _source-of-error_ mitigations (pre-reg ↔
 QRP, audit ↔ random per-study noise, invariance ↔ per-context bias) and
 expect each to address only its corresponding noise source.
 
 **Contrast with the broken-noise-model run** (preserved here as a record of
 what the model-fix changed): the prior Phase 1.D showed R+R precision
-*staying flat* and recall rising sharply with the old ρ parameter — an
+_staying flat_ and recall rising sharply with the old ρ parameter — an
 artifact of the Gaussian-copula form shrinking audit private noise at
-high ρ. Under the corrected additive-bias model, R+R precision *does* fall
+high ρ. Under the corrected additive-bias model, R+R precision _does_ fall
 with bias (modestly) and recall rises (modestly) — both effects are real
 but smaller than the artifact made them look. The diagnostic value of the
-fix: it changed what we *thought* the answer was, and revealed what the
+fix: it changed what we _thought_ the answer was, and revealed what the
 actual model says.
