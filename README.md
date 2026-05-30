@@ -7,10 +7,18 @@ The Pareto frontier for truth-content (precision) and discovery rate (recall)
 of the body of literature is evaluated as a function of increasing
 incentive pressure and agent scale.
 
-We also implement specific safeguards to identify Pareto dominance and tradeoffs.
-Interventions include:
+We start by verifying the model. As incentives increase reward for novel results
+vs replication of previously published work, we observe decreased precision in
+the literature corpus. False negatives increase, generating downward pressure
+on truth-content.
 
-- pre-registration (hypothesis/methods/analysis)
+Next, we implement interventions hypothesized to impact either/both precision
+and recall. Mapped to the Pareto plane, dominance regimes and tradeoffs are
+characterized for baseline, per-intervention, and intervention combinations.
+
+Initial interventions include:
+
+- pre-registration (hypothesis, methods, analysis)
 - incentivized replication + retraction
 - measurement-invariance requirements
 
@@ -20,13 +28,19 @@ Builds on Smaldino & McElreath, _[The natural selection of bad science](https://
 
 For recent results, see [example runs](example-runs/README.md).
 
-Validity gate implemented
+Model verified
 
 - With no mitigation, the literature's truth-content falls
-  as the novelty:replication reward ratio rises: the qualitative crisis dynamic
+  as the novelty:replication reward ratio rises; the qualitative crisis dynamic
   is reproduced.
 
-Currently in-flight extensions:
+Initial interventions (in progress)
+
+- pre-registration: increases precision modestly and has an accompanying decrease in recall
+- incentivized replication plus a retraction mechanism: increases precision moderately, decreases recall significantly
+- measurement-invariance: the initial uniform sampling algorithm compute-restricted experiments to a small number of invariance-replications, so precision improvements were observed, but the significant reduction in recall dominated this intervention; next up: realistic sampling algorithms
+
+Future extensions:
 
 1. correlated errors from shared base models
 2. adaptive (RL) agents that learn to game/reward-hack
@@ -53,5 +67,4 @@ The framing — replication crisis in _automated_ science as a problem worth
 stress-testing via simulation of mitigations — is from one of the project
 bullets on Konstantinos Voudouris's
 [Pivotal mentor profile](https://www.pivotal-research.org/mentors#konstantinos-voudouris).
-The implementation here is mine; design choices, errors, and stylized parameter
-values are mine alone.
+The implementation here is mine; design choices, stylized parameter values, and errors are mine alone.
