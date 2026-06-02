@@ -11,6 +11,16 @@ This document is the curated counterpart to `example-runs/README.md` (which
 records what individual runs produce). Findings live here when they
 generalise across runs or matter as design guides.
 
+**Two load-bearing modeling assumptions** shape much of what follows, and several
+findings are *mechanistic consequences* of them — predictable in closed form, with the
+simulation confirming rather than discovering them. (1) The decision statistic is
+*additive*: `Z = noncentrality + bias + private`, with a per-(h, ctx) systematic
+`bias ~ N(0, bias_strength²)` and a fresh `private ~ N(0, 1)`. (2) Each context's bias
+is an *independent* draw. Assumption (2) is what lets invariance filter bias; if real
+systematic biases persist across contexts (plausible for models sharing training data),
+that advantage shrinks. Treat the `bias_strength` ↔ real-system mappings below as
+illustrative, not measured.
+
 Status legend:
 - **Established** — observed across multiple runs, mechanism understood, robust to expected variations.
 - **Preliminary** — observed in a specific regime; mechanism understood but generalisation untested.
@@ -68,11 +78,13 @@ moderate-bias range, then converges to R+R at the extreme:
 
 | bias_strength | R+R precision | Inv(k=2) precision | Gap (R+R − Inv) |
 |---|---|---|---|
-| 0.0 | 0.93 | 0.82 | +0.11 |
-| 0.5 | 0.91 | 0.73 | +0.18 |
-| 1.0 | 0.82 | 0.47 | +0.35 |
-| 2.0 | 0.30 | 0.17 | +0.13 |
-| 5.0 | 0.11 | 0.11 | 0.00 |
+| 0.0 | 0.93 ± 0.01 | 0.82 ± 0.04 | +0.11 |
+| 0.5 | 0.91 ± 0.01 | 0.73 ± 0.04 | +0.18 |
+| 1.0 | 0.82 ± 0.02 | 0.47 ± 0.08 | +0.35 |
+| 2.0 | 0.30 ± 0.01 | 0.17 ± 0.04 | +0.13 |
+| 5.0 | 0.11 ± 0.00 | 0.11 ± 0.02 | 0.00 |
+
+(10 seeds; ± is sample SD.)
 
 R+R precision is greater than or equal to invariance(k=2) precision at
 every bias_strength tested. They converge at bs=5 only because both have
@@ -103,34 +115,48 @@ under high bias. Sparse uniform attention precludes this; the non-uniform
 attention upgrade is the prerequisite. Also untested: whether the result is
 sensitive to n_contexts (we've only tested 4).
 
+**Load-bearing assumption.** Invariance's bias-robustness depends entirely on each
+context's bias being an *independent* draw (`simulation.py` draws `N(0, bias_strength²)`
+per `(h, ctx)`). If systematic biases persist across contexts — plausible when the
+underlying model is shared, as for LLMs trained on overlapping data — the multi-context
+bar no longer breaks the bias, and invariance's advantage shrinks or disappears. This is
+the single assumption most determinative of the project's central claim; a
+correlated-cross-context arm is needed to test it.
+
 **Status.** Preliminary (one n_contexts, one bias range, one attention
 model).
 
 ---
 
-## 3. Same-base R+R has a sharp cliff between bias_strength = 1 and 2
+## 3. Same-base R+R precision falls steeply between bias_strength = 1 and 2 — a normal-tail effect, not a discontinuity
 
 **Regime.** Phase 1.D extended — bias_strength ∈ {0, 0.5, 1.0, 2.0, 5.0},
 n_contexts=4, uniform attention, novelty_weight=10. Same-base audit:
 audit inherits the per-(h, ctx) systematic bias; private (sampling) noise
 is fresh.
 
-**Result.** R+R precision is high and slowly-falling up to bs=1.0, then
-falls off a cliff:
+**Result.** R+R precision is high and slowly-falling up to bs=1.0, then drops
+steeply:
 
 | bias_strength | Corr | R+R precision | R+R recall |
 |---|---|---|---|
-| 0.0 | 0.00 | 0.93 | 0.19 |
-| 0.5 | 0.20 | 0.91 | 0.22 |
-| 1.0 | 0.50 | 0.82 | 0.27 |
-| **2.0** | **0.80** | **0.30** | **0.39** |
-| 5.0 | 0.96 | 0.11 | 0.64 |
+| 0.0 | 0.00 | 0.93 ± 0.01 | 0.19 ± 0.02 |
+| 0.5 | 0.20 | 0.91 ± 0.01 | 0.22 ± 0.02 |
+| 1.0 | 0.50 | 0.82 ± 0.02 | 0.27 ± 0.02 |
+| **2.0** | **0.80** | **0.30 ± 0.01** | **0.39 ± 0.02** |
+| 5.0 | 0.96 | 0.11 ± 0.00 | 0.64 ± 0.01 |
 
-The cliff between bs=1 and bs=2 is where bias_strength crosses the
-threshold at which `|bias|` is *on its own* large enough to drive
-significance (z_crit ≈ 1.96; at bs=1, P(|bias| > z_crit) ≈ 5%; at bs=2 it
-jumps to ~32%; at bs=5 it's ~69%). At extreme bias, R+R precision falls to
-the `none` floor — the audit can no longer distinguish FPs from TPs.
+(10 seeds; ± is sample SD.) The 0.82 → 0.30 drop is real and far exceeds seed noise,
+but **there are no samples between bs=1 and bs=2**, and the governing quantity is
+smooth. A same-base audit can only retract a false positive whose significance came
+from *sampling* noise; it cannot retract one driven by the shared *bias*, because the
+audit reuses the same per-(h, ctx) bias and redraws only the private term. The fraction
+of FPs that bias alone can sustain is `P(|bias| > z_crit) = 2·(1 − Φ(1.96 / bias_strength))`
+— a normal tail (≈5% at bs=1, ≈32% at bs=2, ≈69% at bs=5). So this is a *steep but
+smooth* transition predicted in closed form, not a discontinuity; "cliff" overstates an
+unsampled region. The simulation confirms the magnitude; the shape between 1 and 2 is
+pending denser sampling. At extreme bias, precision falls to the `none` floor
+(≈ base_rate_true: publication becomes nearly truth-independent).
 
 **Mechanism.** Audit effectiveness depends on the audit's ability to
 distinguish lucky-by-private FPs (where the original's significance
@@ -142,23 +168,26 @@ cliff (bs ≤ 1), bias alone is rarely sufficient — bias + private together
 is the dominant FP path, and audit catches it. Above the cliff (bs ≥ 2),
 bias alone is the dominant FP path, and audit cannot retract it.
 
-**Real-world translation.** For LLM-based audit of LLM-generated findings,
-same-base R+R is likely sufficient at moderate model-noise correlation
-(bs ≤ 1, corresponding to "different sampling temperatures produce
-materially different outputs on the same prompt"). For domains where the
-same-model audit produces highly-correlated outputs to the original
-(near-deterministic same-model behaviour — bs ≥ 2), same-base R+R is
-expected to break. In this regime, switch to cross-model audit (different
-base model, fresh bias) or use a mitigation that addresses bias directly
-(invariance with sufficient k).
+**Real-world translation.** *The `bias_strength` ↔ real-system correlation mapping is
+illustrative, not measured; the numeric thresholds here are conjectural until anchored
+to a real system.* The robust, transferable claim is qualitative: a same-base audit
+catches only *sampling-driven* errors, not errors from a *shared model bias* — so it is
+an argument for **cross-model audit** (an independent bias draw) whenever the original
+and the auditor share a base model. The conjectural quantitative read: if same-model
+outputs are weakly correlated (bs ≲ 1), same-base R+R may suffice; if strongly
+correlated / near-deterministic (bs ≳ 2), it is expected to break, and one should
+switch to cross-model audit or a bias-addressing mitigation (invariance with sufficient
+k).
 
 **What hasn't been tested.** Whether the cliff location depends on
 n_contexts, novelty_weight, audit_sample_size, or audit_fraction. We've
 only tested a single point in those parameter spaces; the cliff might
 shift with them.
 
-**Status.** Established (the cliff is sharp, mechanism is transparent,
-boundaries are explicit; replicated across two sweep ranges).
+**Status.** Preliminary. The *direction and magnitude* are robust (10 seeds, tight
+SDs, replicated across two sweep ranges) and the mechanism is transparent and
+closed-form. The transition *shape* between bs=1 and bs=2 is unsampled and expected to
+be smooth, not a cliff — denser sampling (pending) will settle it.
 
 ---
 
@@ -335,10 +364,12 @@ in recall — and only in the wrong direction for them:
 
 | Mitigation | Precision | Recall | Position |
 |---|---|---|---|
-| `none` | 0.11 | 0.83 | **Pareto-dominant** |
-| `pre-reg (leaky)` | 0.11 | 0.81 | Dominated |
-| `replication+retraction` | 0.11 | 0.64 | Dominated (loses recall to audit retractions) |
-| `invariance (k=2)` | 0.11 | 0.44 | Dominated (loses recall to multi-context buffering) |
+| `none` | 0.11 ± 0.00 | 0.83 ± 0.01 | **Pareto-dominant** |
+| `pre-reg (leaky)` | 0.11 ± 0.00 | 0.81 ± 0.01 | Dominated |
+| `replication+retraction` | 0.11 ± 0.00 | 0.64 ± 0.01 | Dominated (loses recall to audit retractions) |
+| `invariance (k=2)` | 0.11 ± 0.02 | 0.44 ± 0.01 | Dominated (loses recall to multi-context buffering) |
+
+(10 seeds; ± is sample SD. The ≈0.11 precision floor is essentially `base_rate_true` = 0.10.)
 
 At this bias regime, every mitigation costs recall without providing
 precision in return. `none` Pareto-dominates all four.

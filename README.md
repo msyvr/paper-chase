@@ -28,7 +28,7 @@ Builds on Smaldino & McElreath, _[The natural selection of bad science](https://
 
 For recent results, see [example runs](example-runs/README.md).
 
-Model verified
+Statistical engine validated (FPR ≈ α at q=0; power monotone in n)
 
 - With no mitigation, the literature's truth-content falls
   as the novelty:replication reward ratio rises; the qualitative crisis dynamic

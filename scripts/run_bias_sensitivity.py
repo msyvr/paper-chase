@@ -71,7 +71,7 @@ from paper_chase.results_io import (
 #   bs=1.0  → corr=0.50 (the previous sweep's max)
 #   bs=2.0  → corr=0.80 (LLM-instance-like regime)
 #   bs=5.0  → corr=0.96 (extreme; same-LLM near-deterministic)
-BIAS_STRENGTHS = [0.0, 0.5, 1.0, 2.0, 5.0]     # SD of per-(h, ctx) systematic bias
+BIAS_STRENGTHS = [0.0, 0.5, 1.0, 1.25, 1.5, 1.75, 2.0, 5.0]   # SD of per-(h, ctx) bias; densified 1->2 to resolve the transition shape (was [0, 0.5, 1, 2, 5])
 N_SEEDS = 10
 NOVELTY_WEIGHT = 10.0          # mid-pressure: dynamic is fully developed but not extreme
 REPLICATION_WEIGHT = 1.0

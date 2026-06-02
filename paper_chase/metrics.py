@@ -7,6 +7,12 @@ Pareto-optimize for the pair: precision alone can be gamed (publish nothing give
 
 A "standing finding" counts as a TP iff its hypothesis is actually true. A true
 hypothesis counts as discovered iff at least one of its findings is standing.
+
+Note: precision is computed *per standing finding*, so a hypothesis published more
+than once contributes multiple times to the denominator (the literature can carry
+duplicate entries). This is intentional — precision over the literature-as-published —
+but a per-hypothesis variant is a reasonable alternative if duplicate-publication
+dynamics become a focus.
 """
 from __future__ import annotations
 import math
