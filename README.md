@@ -4,13 +4,14 @@ Agent-based simulation of automated science under publish-or-perish incentives.
 
 Paper-chase is a multi-agent simulation of a scientific publishing ecosystem.
 The Pareto frontier for truth-content (precision) and discovery rate (recall)
-of the body of literature is evaluated as a function of increasing
-incentive pressure and agent scale.
+of the body of literature is evaluated as a function of
+incentive pressure and systematic bias.
 
-We start by verifying the model. As incentives increase reward for novel results
-vs replication of previously published work, we observe decreased precision in
-the literature corpus. False negatives increase, generating downward pressure
-on truth-content.
+We start with a validity gate on the statistical engine. As incentives increase
+reward for novel results over replication of previously published work, the
+literature's precision falls: rising QRP inflates the effective false-positive
+rate, so false positives accumulate in the standing literature, driving
+truth-content down.
 
 Next, we implement interventions hypothesized to impact either/both precision
 and recall. Mapped to the Pareto plane, dominance regimes and tradeoffs are
