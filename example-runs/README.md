@@ -136,10 +136,11 @@ at fixed `novelty_weight = 10`, over four mitigations: `none`,
 regime as Phase 1.C (n_hypotheses=10000, n_contexts=4, n_steps=500, uniform
 hypothesis selection). High-k invariance (k=3, k=4) was excluded — Phase 1.C
 established they publish almost nothing in this sparse-attention regime.
-The sweep range was extended to bs=5 to test whether the bias correlation
-strong enough to defeat same-base R+R audit actually does so (correlation
-between same-(h, ctx) studies = bias_strength² / (1+bias_strength²), so
-bs=2 → 0.80, bs=5 → 0.96 — the "same-LLM near-deterministic" regime).
+The sweep range was extended to bs=5 to probe whether strong enough bias
+correlation defeats the same-base R+R audit (intraclass correlation between
+same-(h, ctx) studies = bias_strength² / (1+bias_strength²): bs=2 → 0.80,
+bs=5 → 0.96). The mapping from these correlation values to any real system
+(e.g. "same-LLM near-deterministic") is illustrative, not measured.
 Script: [`scripts/run_bias_sensitivity.py`](../scripts/run_bias_sensitivity.py).
 
 **The claim Phase 1.D is positioned to test.** _Invariance-style mitigations
@@ -160,19 +161,21 @@ independent bias draw, so a single lucky bias cannot carry an FP through.
 | `replication+retraction` | 0.93 / 0.19 | 0.91 / 0.22 | 0.82 / 0.27 | **0.30 / 0.39** | 0.11 / 0.64 |
 | `invariance (k=2)`       | 0.82 / 0.40 | 0.73 / 0.38 | 0.47 / 0.37 | 0.17 / 0.37     | 0.11 / 0.44 |
 
-_(precision / recall, bold marks the R+R cliff)_
+_(precision / recall; bold marks the steep R+R drop between bs=1 and bs=2. 10 seeds; per-cell SDs ≈ 0.01–0.08 — see FINDINGS.md for error bars.)_
 
 **Where the data points.** Two distinct dynamics show up across the
 extended range, neither of which is the predicted invariance-overtakes-R+R
 crossover:
 
-1. **The R+R cliff is real and dramatic** (bs=1 → bs=2). R+R precision
-   collapses from 0.82 to 0.30 over this single doubling of bias_strength.
-   This confirms the mechanism the project intuited — at high correlation,
-   the audit replicate inherits a per-(h, ctx) bias that's large enough on
-   its own to drive significance, so the fresh-private-noise trick no
-   longer suffices to retract lucky-bias FPs. **R+R is regime-specific,
-   not unconditionally robust.**
+1. **The R+R precision drop is real and large** (bs=1 → bs=2): 0.82 → 0.30
+   over this doubling of bias_strength, far exceeding seed noise (SDs ≈ 0.01–0.02).
+   But the region between bs=1 and bs=2 is *unsampled*, and the governing quantity
+   — `P(|bias| > z_crit)`, a normal tail — is smooth, so this is a steep transition,
+   not a discontinuity ("cliff" overstated it; a denser sweep is pending). The
+   mechanism is as the project intuited — at high correlation, the audit replicate
+   inherits a per-(h, ctx) bias large enough on its own to drive significance, so the
+   fresh-private-noise trick no longer suffices to retract lucky-bias FPs. **R+R is
+   regime-specific, not unconditionally robust.**
 
 2. **Invariance(k=2) collapses faster than R+R across the entire range.**
    At every bias_strength tested, R+R precision ≥ invariance(k=2)
@@ -212,8 +215,8 @@ bs=1.0, P(|bias| > z_crit) ≈ 5%), so audit's fresh private noise breaks
 the combination and retracts FPs. At high bias (bs ≥ 2), P(|bias| > z_crit)
 becomes substantial (≈ 32% at bs=2, ≈ 69% at bs=5) — bias alone drives
 significance, audit always confirms because it inherits the same bias,
-and R+R can no longer distinguish FPs from TPs. The cliff between bs=1
-and bs=2 corresponds to this transition.
+and R+R can no longer distinguish FPs from TPs. This steep (but smooth)
+transition falls between bs=1 and bs=2 — a region not yet directly sampled.
 
 **Where this points next**:
 
@@ -227,9 +230,9 @@ and bs=2 corresponds to this transition.
 2. **Phase 2.B — cross-base audit comparison**. A small extension to
    `ReplicationAndRetraction` (one boolean parameter) that draws a fresh
    bias per audit instead of inheriting the (h, ctx) bias. With the
-   same-base R+R cliff now empirically located at bs ≈ 1.5–2.0, the
-   directly-actionable question is whether cross-base audit pushes the
-   cliff to higher bias or eliminates it. If yes, the alignment-relevant
+   same-base R+R drop now bracketed between bs=1 and bs=2 (not yet localized
+   within that interval), the directly-actionable question is whether cross-base
+   audit pushes the transition to higher bias or eliminates it. If yes, the alignment-relevant
    recommendation is "use cross-base audit when expected bias > some
    threshold." If no, cross-base audit doesn't help and the recommendation
    shifts to invariance.
