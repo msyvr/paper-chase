@@ -22,6 +22,23 @@ explicit comparison: lets the headline result (invariance > replication under
 correlated errors) be supplemented with a direct demonstration of when
 cross-model replication is sufficient vs. when invariance still wins.
 
+### Cross-context bias persistence (the central-claim stress test)
+
+`simulation.py` draws each `(hypothesis, context)` bias *independently*
+(`bias ~ N(0, bias_strength²)` per pair). That cross-context independence is what lets
+invariance filter bias (a lucky bias in one context is an independent draw in another) — and it
+is the **single assumption most determinative of the project's central claim** (FINDINGS
+Finding 2). If a shared base model's bias *persists across contexts* (plausible — the contexts
+share the model), multi-context evidence requirements weaken alongside same-base audit, and
+invariance's advantage shrinks or disappears.
+
+Scaffolding shape: split the bias into a per-hypothesis component (shared across that
+hypothesis's contexts) and a per-(h, ctx) component, mixed by `cross_context_rho ∈ [0, 1]`
+(0 = current independent-context model; 1 = bias fully shared across contexts). Re-run the
+Phase 1.D invariance-vs-R+R comparison across that knob. Cheap (local sim), highest scientific
+value — it tests whether the headline (invariance beats same-base audit under correlated error)
+survives when the correlation is *cross-context*, not just within-(h, ctx).
+
 ### Fractional pre-registration coverage
 
 `PreRegistration` currently treats coverage as binary — every study is pre-
@@ -57,6 +74,29 @@ This was flagged during Phase 1.C analysis: at `n_hypotheses=10000` with
 `n_steps=1500`, invariance k≥3 has enough data to function but the comparison
 remains artificially flat across hypotheses. Non-uniform selection is the
 realism upgrade that makes the regime question disappear.
+
+---
+
+## External validity
+
+### Calibrating bias to a real automated-research system
+
+The map from `bias_strength` to any specific deployed system is illustrative, not measured
+(`docs/bias-strength-units.md`). But the external-validity question — *where does real practice
+sit on the bias axis?* — is empirically resolvable, because the governing quantity (the
+original–auditor correlation) is directly measurable.
+
+Experiment: take a batch of hypotheses/analyses with ground truth (or a set of known-false
+ones), run a same-model audit and a different-family-model audit, and measure either (a) the
+same-model audit's false-confirm rate on the false items, or (b) the correlation between the two
+models' conclusions/errors on the same questions. `corr = bs²/(1+bs²)` backs out the effective
+`bias_strength`; reading it against Finding 3 says whether same-base auditing is in its safe or
+broken regime for that system.
+
+Why it matters: converts the conditional finding ("same-base audit fails once the
+original–auditor correlation passes ~0.5–0.8") into a *calibrated* recommendation for a specific
+deployment. The single most decision-relevant follow-up — and, unlike the sim extensions, an
+empirical measurement on a real system rather than a model change.
 
 ---
 

@@ -151,7 +151,11 @@ smoothly through the 1→2 window:
 
 (30 seeds; ± is the 95% t-CI for the mean. "bias-sustained FP frac." is the closed-form
 `P(|bias| > z_crit) = 2·(1 − Φ(1.96 / bias_strength))` — the fraction of false positives bias
-alone can sustain past the audit.) The 1→2 window is now densely sampled: precision descends
+alone can sustain past the audit. In interpretable units: a genuine effect contributes ≈2.2 to
+Z, so `bias_strength`=2 is a model blind-spot ≈0.9× the size of a real effect — and an 0.80
+correlation between two same-model re-runs; see
+[`docs/bias-strength-units.md`](docs/bias-strength-units.md) for the full conversion table.)
+The 1→2 window is now densely sampled: precision descends
 monotonically (0.825 → 0.706 → 0.537 → 0.393 → 0.295) and tracks the smooth rise of the
 closed-form FP fraction. So the transition is **steep but smooth**, as predicted in closed
 form — not a discontinuity. A same-base audit can only retract a false positive whose
