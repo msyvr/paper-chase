@@ -45,9 +45,11 @@ Output: a fresh per-run directory under ``results/`` containing
 from __future__ import annotations
 
 import math
+import os
 
 import numpy as np
 import matplotlib.pyplot as plt
+from scipy import stats
 
 from paper_chase.config import (
     SimConfig, IncentiveConfig, WorldConfig, StudyConfig,
@@ -61,6 +63,22 @@ from paper_chase.results_io import (
 )
 
 
+def ci95_half(vals: list[float]) -> float:
+    """Half-width of the 95% t-confidence interval for the mean (0.0 if n < 2).
+
+    Reported instead of sample SD because the claims are about the *mean*
+    precision/recall and about differences between mitigations, not about
+    single-run spread. Each seed is one independent simulated literature, so the
+    seed is the replication unit and n = number of seeds (no pseudo-replication:
+    precision is a per-run scalar, not a per-hypothesis count).
+    """
+    n = len(vals)
+    if n < 2:
+        return 0.0
+    se = float(np.std(vals, ddof=1)) / math.sqrt(n)
+    return float(stats.t.ppf(0.975, n - 1) * se)
+
+
 # ---- Sweep parameters ----
 # Extended range to test the high-correlation regime where R+R is
 # mechanistically expected to break (same-base audit can't distinguish
@@ -71,8 +89,12 @@ from paper_chase.results_io import (
 #   bs=1.0  → corr=0.50 (the previous sweep's max)
 #   bs=2.0  → corr=0.80 (LLM-instance-like regime)
 #   bs=5.0  → corr=0.96 (extreme; same-LLM near-deterministic)
-BIAS_STRENGTHS = [0.0, 0.5, 1.0, 1.25, 1.5, 1.75, 2.0, 5.0]   # SD of per-(h, ctx) bias; densified 1->2 to resolve the transition shape (was [0, 0.5, 1, 2, 5])
-N_SEEDS = 10
+# Defaults below; both overridable via env for cheap smoke tests:
+#   PC_BIAS_STRENGTHS="0,1.5,5" PC_N_SEEDS=2 uv run python scripts/run_bias_sensitivity.py
+_DEFAULT_BIAS_STRENGTHS = [0.0, 0.5, 1.0, 1.25, 1.5, 1.75, 2.0, 5.0]   # SD of per-(h, ctx) bias; densified 1->2 to resolve the transition shape (was [0, 0.5, 1, 2, 5])
+BIAS_STRENGTHS = ([float(x) for x in os.environ["PC_BIAS_STRENGTHS"].split(",")]
+                  if os.environ.get("PC_BIAS_STRENGTHS") else _DEFAULT_BIAS_STRENGTHS)
+N_SEEDS = int(os.environ.get("PC_N_SEEDS", "30"))   # seeds = independent simulated literatures (the replication unit); 10->30 tightens the 95% CIs for the writeup
 NOVELTY_WEIGHT = 10.0          # mid-pressure: dynamic is fully developed but not extreme
 REPLICATION_WEIGHT = 1.0
 EFFORT_COST_PER_SAMPLE = 0.02
@@ -136,8 +158,8 @@ def main() -> None:
 
     for mit_name, factory in MITIGATION_FACTORIES.items():
         aggregates[mit_name] = {
-            "bias_strength": [], "precision_mean": [], "precision_sd": [],
-            "recall_mean": [], "recall_sd": [],
+            "bias_strength": [], "precision_mean": [], "precision_sd": [], "precision_ci": [],
+            "recall_mean": [], "recall_sd": [], "recall_ci": [],
         }
         for bs in BIAS_STRENGTHS:
             precisions: list[float] = []
@@ -179,10 +201,12 @@ def main() -> None:
                 aggregates[mit_name]["precision_sd"].append(
                     float(np.std(precisions, ddof=1)) if len(precisions) > 1 else 0.0
                 )
+                aggregates[mit_name]["precision_ci"].append(ci95_half(precisions))
                 aggregates[mit_name]["recall_mean"].append(float(np.mean(recalls)))
                 aggregates[mit_name]["recall_sd"].append(
                     float(np.std(recalls, ddof=1)) if len(recalls) > 1 else 0.0
                 )
+                aggregates[mit_name]["recall_ci"].append(ci95_half(recalls))
 
     save_data_csv(run_dir / "data.csv", rows)
 
@@ -199,7 +223,7 @@ def main() -> None:
 
         # Left: precision vs bias_strength
         ax_bs.errorbar(
-            agg["bias_strength"], agg["precision_mean"], yerr=agg["precision_sd"],
+            agg["bias_strength"], agg["precision_mean"], yerr=agg["precision_ci"],
             fmt="o-", capsize=3, color=color, label=mit_name,
         )
 
@@ -207,7 +231,7 @@ def main() -> None:
         # Annotate endpoints with their bias_strength so direction of travel is legible.
         ax_pareto.errorbar(
             agg["recall_mean"], agg["precision_mean"],
-            xerr=agg["recall_sd"], yerr=agg["precision_sd"],
+            xerr=agg["recall_ci"], yerr=agg["precision_ci"],
             fmt="o-", capsize=3, alpha=0.75, color=color, label=mit_name,
         )
         ax_pareto.annotate(
@@ -227,6 +251,19 @@ def main() -> None:
         linestyle="None", label="ideal (1, 1)",
     )
 
+    # Closed-form reference: the fraction of false positives that bias alone can
+    # sustain past z_crit, 2(1 - Phi(1.96/bs)) — the smooth normal-tail "driver"
+    # behind R+R's precision drop. On a twin axis so the measured R+R steepness
+    # reads against the analytic shape (settles "steep but smooth," not a cliff).
+    ax_bs2 = ax_bs.twinx()
+    _bs_fine = np.linspace(0.01, max(BIAS_STRENGTHS), 300)
+    _bias_tail = 2.0 * (1.0 - stats.norm.cdf(1.96 / _bs_fine))
+    ax_bs2.plot(_bs_fine, _bias_tail, "--", color="gray", alpha=0.6,
+                label=r"bias-sustained FP fraction  $2(1-\Phi(1.96/\mathrm{bs}))$")
+    ax_bs2.set_ylabel("bias-sustained FP fraction (closed form)")
+    ax_bs2.set_ylim(0, 1.05)
+    ax_bs2.legend(loc="upper right", fontsize=8)
+
     ax_bs.set_xlabel("bias strength (SD of per-(h, ctx) systematic bias)")
     ax_bs.set_ylabel("truth-content (precision)")
     ax_bs.set_title("Precision vs bias strength — direct comparison")
@@ -245,7 +282,7 @@ def main() -> None:
 
     fig.suptitle(
         f"Phase 1.D — bias-strength sensitivity (novelty_weight = {NOVELTY_WEIGHT:g}, "
-        f"n_contexts = {N_CONTEXTS}, {N_SEEDS} seeds/point)",
+        f"n_contexts = {N_CONTEXTS}, {N_SEEDS} seeds/point; error bars = 95% CI)",
         y=1.02,
     )
     fig.tight_layout()
@@ -253,6 +290,16 @@ def main() -> None:
     fig_path = run_dir / "bias_sensitivity.png"
     fig.savefig(fig_path, dpi=150, bbox_inches="tight")
     print(f"\nSaved: {fig_path}")
+
+    print("\n=== mean ± 95% CI by mitigation × bias_strength (P=precision, R=recall) ===")
+    for mit_name in MITIGATION_FACTORIES:
+        agg = aggregates[mit_name]
+        cells = [
+            f"bs={bs:g}: P={agg['precision_mean'][j]:.3f}±{agg['precision_ci'][j]:.3f} "
+            f"R={agg['recall_mean'][j]:.3f}±{agg['recall_ci'][j]:.3f}"
+            for j, bs in enumerate(agg["bias_strength"])
+        ]
+        print(f"{mit_name:>27}:\n    " + "\n    ".join(cells))
 
 
 if __name__ == "__main__":

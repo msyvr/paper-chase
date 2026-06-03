@@ -130,28 +130,31 @@ independent bias draw, so a single lucky bias cannot carry an FP through.
 
 ![Phase 1.D bias sensitivity](images/phase-1d-bias-sensitivity.png)
 
-| Mitigation               | bs=0        | bs=0.5      | bs=1        | bs=2            | bs=5        |
-| ------------------------ | ----------- | ----------- | ----------- | --------------- | ----------- |
-| `none`                   | 0.41 / 0.77 | 0.33 / 0.77 | 0.22 / 0.76 | 0.14 / 0.77     | 0.11 / 0.83 |
-| `pre-reg (leaky)`        | 0.57 / 0.72 | 0.45 / 0.71 | 0.28 / 0.72 | 0.15 / 0.73     | 0.11 / 0.81 |
-| `replication+retraction` | 0.93 / 0.19 | 0.91 / 0.22 | 0.82 / 0.27 | **0.30 / 0.39** | 0.11 / 0.64 |
-| `invariance (k=2)`       | 0.82 / 0.40 | 0.73 / 0.38 | 0.47 / 0.37 | 0.17 / 0.37     | 0.11 / 0.44 |
+| bias_strength | `none` | `pre-reg (leaky)` | `replication+retraction` | `invariance (k=2)` |
+| --- | --- | --- | --- | --- |
+| 0.0  | 0.39 / 0.77 | 0.57 / 0.72 | 0.93 / 0.19 | 0.82 / 0.40 |
+| 0.5  | 0.32 / 0.77 | 0.45 / 0.72 | 0.91 / 0.22 | 0.72 / 0.39 |
+| 1.0  | 0.21 / 0.76 | 0.27 / 0.71 | 0.82 / 0.27 | 0.46 / 0.37 |
+| 1.25 | 0.18 / 0.77 | 0.22 / 0.72 | 0.71 / 0.31 | 0.34 / 0.37 |
+| 1.5  | 0.16 / 0.77 | 0.18 / 0.72 | 0.54 / 0.34 | 0.27 / 0.37 |
+| 1.75 | 0.14 / 0.77 | 0.16 / 0.73 | 0.39 / 0.37 | 0.21 / 0.37 |
+| 2.0  | 0.13 / 0.77 | 0.14 / 0.73 | 0.30 / 0.39 | 0.18 / 0.37 |
+| 5.0  | 0.11 / 0.83 | 0.11 / 0.81 | 0.11 / 0.64 | 0.11 / 0.45 |
 
-_(precision / recall; bold marks the steep R+R drop between bs=1 and bs=2. 10 seeds; per-cell SDs ≈ 0.01–0.08 — see FINDINGS.md for error bars.)_
+_(precision / recall per cell; 30 seeds, 95% CIs ≈ ±0.005–0.03 on precision — see FINDINGS.md Finding 3 for the R+R column with explicit CIs. Read the R+R column top-to-bottom for the smooth 1→2 descent.)_
 
 **Where the data points.** Two distinct dynamics show up across the
 extended range, neither of which is the predicted invariance-overtakes-R+R
 crossover:
 
-1. **The R+R precision drop is real and large** (bs=1 → bs=2): 0.82 → 0.30
-   over this doubling of bias_strength, far exceeding seed noise (SDs ≈ 0.01–0.02).
-   But the region between bs=1 and bs=2 is *unsampled*, and the governing quantity
-   — `P(|bias| > z_crit)`, a normal tail — is smooth, so this is a steep transition,
-   not a discontinuity ("cliff" overstated it; a denser sweep is pending). The
-   mechanism is as the project intuited — at high correlation, the audit replicate
-   inherits a per-(h, ctx) bias large enough on its own to drive significance, so the
-   fresh-private-noise trick no longer suffices to retract lucky-bias FPs. **R+R is
-   regime-specific, not unconditionally robust.**
+1. **R+R precision falls steeply but smoothly through the 1→2 window.** Densely
+   sampled at 30 seeds, precision descends monotonically (0.82 → 0.71 → 0.54 → 0.39 →
+   0.30) and tracks the closed-form normal-tail driver `P(|bias| > z_crit) =
+   2(1−Φ(1.96/bs))` — a steep transition, not a discontinuity. The mechanism is as the
+   project intuited: at high correlation the audit replicate inherits a per-(h, ctx)
+   bias large enough on its own to drive significance, so the fresh-private-noise trick
+   no longer suffices to retract lucky-bias FPs. **R+R is regime-specific, not
+   unconditionally robust.**
 
 2. **Invariance(k=2) collapses faster than R+R across the entire range.**
    At every bias_strength tested, R+R precision ≥ invariance(k=2)
@@ -176,18 +179,18 @@ for running it.
 
 **Where this points next**:
 
-1. **Phase 2 — non-uniform hypothesis selection** (FUTURE*WORK.md). The
+1. **Phase 2 — non-uniform hypothesis selection** ([FUTURE_WORK.md](../FUTURE_WORK.md)). The
    prerequisite for testing high-k invariance. Under power-law attention,
    heavily-studied H accumulate the multi-context coverage that lets k=3,
    k=4 invariance actually filter; the long tail keeps `none` recall
-   meaningful. This unlocks the \_real* invariance vs. R+R comparison at
+   meaningful. This unlocks the _real_ invariance vs. R+R comparison at
    the regime (bs ≥ 2) where R+R has just been shown to break.
 
 2. **Phase 2.B — cross-base audit comparison**. A small extension to
    `ReplicationAndRetraction` (one boolean parameter) that draws a fresh
    bias per audit instead of inheriting the (h, ctx) bias. With the
-   same-base R+R drop now bracketed between bs=1 and bs=2 (not yet localized
-   within that interval), the directly-actionable question is whether cross-base
+   same-base R+R transition now mapped across the 1→2 window, the
+   directly-actionable question is whether cross-base
    audit pushes the transition to higher bias or eliminates it. If yes, the alignment-relevant
    recommendation is "use cross-base audit when expected bias > some
    threshold." If no, cross-base audit doesn't help and the recommendation
@@ -205,10 +208,10 @@ for running it.
    the parameter space rather than test single points.
 
 **One observation to carry forward**: pre-registration (leaky) does _not_
-defend against bias-driven FPs in this model — its trajectory falls in
-parallel with `none`, just shifted up by the QRP-clamp's effect. Pre-reg
-addresses one source of inflated significance (QRP); bias is a separate
-source; pre-reg doesn't touch it. This suggests a useful refinement to the
+defend against bias-driven FPs in this model — its QRP lift over `none` is
+largest at low bias and converges to zero as bias dominates (both hit the
+~0.11 floor). Pre-reg addresses one source of inflated significance (QRP);
+bias is a separate source; pre-reg doesn't touch it. This suggests a useful refinement to the
 mitigation taxonomy: distinguish _source-of-error_ mitigations (pre-reg ↔
 QRP, audit ↔ random per-study noise, invariance ↔ per-context bias) and
 expect each to address only its corresponding noise source.

@@ -70,21 +70,21 @@ across two regime sweeps).
 
 ## 2. k=2 invariance is the structurally weakest version of the multi-context filter
 
-**Regime.** Phase 1.D extended — bias_strength ∈ {0, 0.5, 1.0, 2.0, 5.0},
-novelty_weight = 10, n_contexts = 4, uniform attention.
+**Regime.** Phase 1.D — bias_strength ∈ {0, 0.5, 1.0, 2.0, 5.0},
+novelty_weight = 10, n_contexts = 4, uniform attention, 30 seeds (subset of the densified sweep).
 
 **Result.** Invariance(k=2) precision falls faster than R+R across the
 moderate-bias range, then converges to R+R at the extreme:
 
 | bias_strength | R+R precision | Inv(k=2) precision | Gap (R+R − Inv) |
 |---|---|---|---|
-| 0.0 | 0.93 ± 0.01 | 0.82 ± 0.04 | +0.11 |
-| 0.5 | 0.91 ± 0.01 | 0.73 ± 0.04 | +0.18 |
-| 1.0 | 0.82 ± 0.02 | 0.47 ± 0.08 | +0.35 |
-| 2.0 | 0.30 ± 0.01 | 0.17 ± 0.04 | +0.13 |
-| 5.0 | 0.11 ± 0.00 | 0.11 ± 0.02 | 0.00 |
+| 0.0 | 0.929 ± 0.004 | 0.822 ± 0.010 | +0.107 |
+| 0.5 | 0.912 ± 0.005 | 0.715 ± 0.017 | +0.197 |
+| 1.0 | 0.825 ± 0.008 | 0.459 ± 0.027 | +0.366 |
+| 2.0 | 0.295 ± 0.005 | 0.175 ± 0.013 | +0.120 |
+| 5.0 | 0.112 ± 0.001 | 0.113 ± 0.006 | −0.001 |
 
-(10 seeds; ± is sample SD.)
+(30 seeds; ± is the 95% t-CI for the mean.)
 
 R+R precision is greater than or equal to invariance(k=2) precision at
 every bias_strength tested. They converge at bs=5 only because both have
@@ -130,33 +130,35 @@ model).
 
 ## 3. Same-base R+R precision falls steeply between bias_strength = 1 and 2 — a normal-tail effect, not a discontinuity
 
-**Regime.** Phase 1.D extended — bias_strength ∈ {0, 0.5, 1.0, 2.0, 5.0},
-n_contexts=4, uniform attention, novelty_weight=10. Same-base audit:
+**Regime.** Phase 1.D, densified — bias_strength ∈ {0, 0.5, 1.0, 1.25, 1.5, 1.75, 2.0, 5.0},
+n_contexts=4, uniform attention, novelty_weight=10, 30 seeds. Same-base audit:
 audit inherits the per-(h, ctx) systematic bias; private (sampling) noise
 is fresh.
 
-**Result.** R+R precision is high and slowly-falling up to bs=1.0, then drops
-steeply:
+**Result.** R+R precision is high and slowly-falling up to bs=1.0, then falls steeply and
+smoothly through the 1→2 window:
 
-| bias_strength | Corr | R+R precision | R+R recall |
-|---|---|---|---|
-| 0.0 | 0.00 | 0.93 ± 0.01 | 0.19 ± 0.02 |
-| 0.5 | 0.20 | 0.91 ± 0.01 | 0.22 ± 0.02 |
-| 1.0 | 0.50 | 0.82 ± 0.02 | 0.27 ± 0.02 |
-| **2.0** | **0.80** | **0.30 ± 0.01** | **0.39 ± 0.02** |
-| 5.0 | 0.96 | 0.11 ± 0.00 | 0.64 ± 0.01 |
+| bias_strength | Corr | bias-sustained FP frac. | R+R precision | R+R recall |
+|---|---|---|---|---|
+| 0.0 | 0.00 | 0.000 | 0.929 ± 0.004 | 0.189 ± 0.006 |
+| 0.5 | 0.20 | 0.000 | 0.912 ± 0.005 | 0.217 ± 0.006 |
+| 1.0 | 0.50 | 0.050 | 0.825 ± 0.008 | 0.274 ± 0.007 |
+| 1.25 | 0.61 | 0.117 | 0.706 ± 0.010 | 0.306 ± 0.006 |
+| 1.5 | 0.69 | 0.191 | 0.537 ± 0.010 | 0.339 ± 0.006 |
+| 1.75 | 0.75 | 0.263 | 0.393 ± 0.007 | 0.366 ± 0.007 |
+| **2.0** | **0.80** | **0.327** | **0.295 ± 0.005** | **0.392 ± 0.006** |
+| 5.0 | 0.96 | 0.690 | 0.112 ± 0.001 | 0.640 ± 0.005 |
 
-(10 seeds; ± is sample SD.) The 0.82 → 0.30 drop is real and far exceeds seed noise,
-but **there are no samples between bs=1 and bs=2**, and the governing quantity is
-smooth. A same-base audit can only retract a false positive whose significance came
-from *sampling* noise; it cannot retract one driven by the shared *bias*, because the
-audit reuses the same per-(h, ctx) bias and redraws only the private term. The fraction
-of FPs that bias alone can sustain is `P(|bias| > z_crit) = 2·(1 − Φ(1.96 / bias_strength))`
-— a normal tail (≈5% at bs=1, ≈32% at bs=2, ≈69% at bs=5). So this is a *steep but
-smooth* transition predicted in closed form, not a discontinuity; "cliff" overstates an
-unsampled region. The simulation confirms the magnitude; the shape between 1 and 2 is
-pending denser sampling. At extreme bias, precision falls to the `none` floor
-(≈ base_rate_true: publication becomes nearly truth-independent).
+(30 seeds; ± is the 95% t-CI for the mean. "bias-sustained FP frac." is the closed-form
+`P(|bias| > z_crit) = 2·(1 − Φ(1.96 / bias_strength))` — the fraction of false positives bias
+alone can sustain past the audit.) The 1→2 window is now densely sampled: precision descends
+monotonically (0.825 → 0.706 → 0.537 → 0.393 → 0.295) and tracks the smooth rise of the
+closed-form FP fraction. So the transition is **steep but smooth**, as predicted in closed
+form — not a discontinuity. A same-base audit can only retract a false positive whose
+significance came from *sampling* noise; it cannot retract one driven by the shared *bias*,
+because the audit reuses the same per-(h, ctx) bias and redraws only the private term. At
+extreme bias, precision falls to the `none` floor (≈ base_rate_true: publication becomes
+nearly truth-independent).
 
 **Mechanism.** Audit effectiveness depends on the audit's ability to
 distinguish lucky-by-private FPs (where the original's significance
@@ -164,8 +166,8 @@ required favourable random sampling) from signal-bearing TPs. The audit's
 fresh private noise breaks the original lucky-private draw, retracting
 those FPs. But the audit *inherits* the per-(h, ctx) bias, so any FP whose
 bias alone was enough to clear z_crit is confirmed by the audit. Below the
-cliff (bs ≤ 1), bias alone is rarely sufficient — bias + private together
-is the dominant FP path, and audit catches it. Above the cliff (bs ≥ 2),
+transition (bs ≤ 1), bias alone is rarely sufficient — bias + private together
+is the dominant FP path, and audit catches it. Above it (bs ≥ 2),
 bias alone is the dominant FP path, and audit cannot retract it.
 
 **Real-world translation.** *The `bias_strength` ↔ real-system correlation mapping is
@@ -179,15 +181,15 @@ correlated / near-deterministic (bs ≳ 2), it is expected to break, and one sho
 switch to cross-model audit or a bias-addressing mitigation (invariance with sufficient
 k).
 
-**What hasn't been tested.** Whether the cliff location depends on
+**What hasn't been tested.** Whether the transition location depends on
 n_contexts, novelty_weight, audit_sample_size, or audit_fraction. We've
-only tested a single point in those parameter spaces; the cliff might
+only tested a single point in those parameter spaces; the transition might
 shift with them.
 
-**Status.** Preliminary. The *direction and magnitude* are robust (10 seeds, tight
-SDs, replicated across two sweep ranges) and the mechanism is transparent and
-closed-form. The transition *shape* between bs=1 and bs=2 is unsampled and expected to
-be smooth, not a cliff — denser sampling (pending) will settle it.
+**Status.** Established. The 1→2 transition is now densely sampled (30 seeds, 95% CIs):
+precision descends monotonically and smoothly, tracking the closed-form normal-tail driver,
+and reproduces the original endpoints. Direction, magnitude, and shape are all resolved. What
+remains open is only the transition's *location* under other (n_contexts, audit) settings.
 
 ---
 
@@ -195,20 +197,21 @@ be smooth, not a cliff — denser sampling (pending) will settle it.
 
 **Regime.** Phase 1.D bias sweep with pre-registration (leaky, qrp_cap=0.1).
 
-**Result.** Pre-reg precision falls in parallel with `none` as
-bias_strength rises (0.57 → 0.28 vs. `none` 0.41 → 0.22). Pre-reg shifts
-precision up by a roughly constant ~0.15 across the range (the QRP
-suppression) but **does not reduce the slope** (the bias degradation). See
+**Result.** Pre-reg lifts precision over `none` by suppressing QRP, but the lift is
+largest at low bias and **shrinks to nothing as bias dominates**: the pre-reg − `none`
+precision gap runs 0.18 (bs=0) → 0.13 (bs=0.5) → 0.06 (bs=1) → ~0.01 (bs≥2), both curves
+converging onto the ~0.11 floor at high bias. Pre-reg moves the intercept (QRP exposure),
+not the bias-driven descent — so it cannot defend against bias-driven FPs. See
 [Phase 1.D](example-runs/README.md#phase-1d--bias-strength-sensitivity).
 
 **Mechanism.** Pre-registration clamps `qrp_intensity` at the action stage —
 it caps how much a researcher can inflate effective α through analytic
 flexibility. Systematic bias enters the test statistic *additively* and is
 unaffected by anything the researcher does. Two independent sources of
-false positives; pre-reg addresses only one. The slope of `none` and
-pre-reg curves on the precision-vs-bias panel is the visual signature: same
-slope means same bias-sensitivity; different intercepts means different QRP
-exposure.
+false positives; pre-reg addresses only one. The visual signature on the
+precision-vs-bias panel: pre-reg sits above `none` at low bias (the QRP lift) but
+converges onto it as bias rises — the lift is bias-orthogonal, and the bias-driven
+descent is untouched.
 
 **Real-world translation.** Pre-registration mandates cannot substitute for
 bias-addressing mitigations. If the deployment's primary FP source is
@@ -222,7 +225,7 @@ error sources are addressed."
 QRP regimes extreme enough that the QRP suppression dominates other
 dynamics.
 
-**Status.** Established (the parallel-slope behaviour is consistent across
+**Status.** Established (the QRP-lift-then-converge behaviour is consistent across
 all bias_strength values tested and is mechanistically transparent).
 
 ---
@@ -364,12 +367,12 @@ in recall — and only in the wrong direction for them:
 
 | Mitigation | Precision | Recall | Position |
 |---|---|---|---|
-| `none` | 0.11 ± 0.00 | 0.83 ± 0.01 | **Pareto-dominant** |
-| `pre-reg (leaky)` | 0.11 ± 0.00 | 0.81 ± 0.01 | Dominated |
-| `replication+retraction` | 0.11 ± 0.00 | 0.64 ± 0.01 | Dominated (loses recall to audit retractions) |
-| `invariance (k=2)` | 0.11 ± 0.02 | 0.44 ± 0.01 | Dominated (loses recall to multi-context buffering) |
+| `none` | 0.106 ± 0.001 | 0.828 ± 0.004 | **Pareto-dominant** |
+| `pre-reg (leaky)` | 0.107 ± 0.001 | 0.809 ± 0.004 | Dominated |
+| `replication+retraction` | 0.112 ± 0.001 | 0.640 ± 0.005 | Dominated (loses recall to audit retractions) |
+| `invariance (k=2)` | 0.113 ± 0.006 | 0.448 ± 0.006 | Dominated (loses recall to multi-context buffering) |
 
-(10 seeds; ± is sample SD. The ≈0.11 precision floor is essentially `base_rate_true` = 0.10.)
+(30 seeds; ± is the 95% t-CI for the mean. The ≈0.11 precision floor is essentially `base_rate_true` = 0.10.)
 
 At this bias regime, every mitigation costs recall without providing
 precision in return. `none` Pareto-dominates all four.
@@ -404,7 +407,7 @@ at the regime currently testable" — Phase 2 might extend the useful band.
 **What hasn't been tested.** Whether the convergence point (bs at which
 all mitigations collapse to `none` precision) shifts with n_contexts,
 audit_sample_size, audit_fraction, or per-study effect size / sample size.
-The cliff in Finding 3 located the regime transition for R+R; the
+The transition in Finding 3 located the regime shift for R+R; the
 analogous transition for invariance and the collapse point for the whole
 mitigation set haven't been fully mapped.
 

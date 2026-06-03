@@ -37,13 +37,13 @@ Statistical engine validated (FPR ≈ α at q=0; power monotone in n)
 
 Initial interventions (in progress)
 
-- pre-registration: increases precision modestly and has an accompanying decrease in recall
-- incentivized replication plus a retraction mechanism: increases precision moderately, decreases recall significantly
+- pre-registration: a modest precision lift (largest at low bias, vanishing as systematic bias takes over — it addresses QRP, not bias) at a small recall cost
+- incentivized replication + retraction: raises precision substantially at low–moderate bias and cuts recall; but a same-base audit *inherits* the shared systematic bias, so its precision collapses once that bias is strong — an argument for cross-model audit
 - measurement-invariance: the initial uniform sampling algorithm compute-restricted experiments to a small number of invariance-replications, so precision improvements were observed, but the significant reduction in recall dominated this intervention; next up: realistic sampling algorithms
 
 Future extensions:
 
-1. correlated errors from shared base models
+1. cross-context bias persistence — does invariance keep its advantage when a shared base model's bias persists *across* contexts, not just within? (the load-bearing test; the current model draws each context's bias independently)
 2. adaptive (RL) agents that learn to game/reward-hack
 3. early-warning detection
 
