@@ -20,44 +20,28 @@ Script: [`scripts/run_baseline.py`](../scripts/run_baseline.py).
 
 ![Phase 0 validity gate](images/phase-0-validity-gate.png)
 
-**Interpretation.** Truth-content (precision) falls from 0.50 (low pressure)
-to 0.39 (high pressure) as the novelty:replication ratio rises — the
-qualitative replication-crisis dynamic the model is meant to reproduce.
-Discovery rate (recall) sits in 0.73–0.77 across all conditions: with
-~22,500 novel actions spread over 10,000 hypotheses, the expected ~2.25
-studies per hypothesis is enough to detect most true effects at the
-configured per-study power (~0.71 without QRP, ~0.90 with moderate QRP) but
-not all of them. Recall rises very slightly with pressure because QRP
-inflates effective α and so raises true-positive detection alongside
-false-positive rate.
+**Interpretation.** Precision falls from 0.50 to 0.39 as the novelty:replication
+ratio rises — the replication-crisis dynamic the model is meant to reproduce.
+Recall holds at 0.73–0.77 throughout (≈2.25 studies/hypothesis detects most but
+not all true effects, at per-study power ~0.71), rising slightly with pressure as
+QRP inflates effective α. The Pareto trajectory (right panel) drifts from high-
+to low-precision at roughly constant recall — the trade-off, visualised directly.
 
-The Pareto-plane trajectory (right panel) drifts from upper-position
-(low-pressure, dark) toward lower-position (high-pressure, yellow) at
-roughly constant recall — same data, the precision–recall trade-off
-visualised directly.
-
-Validity gate passed: the engine produces the known precision-decline
-phenomenon at non-saturating recall, licensing the work to proceed to
-mitigations.
+Validity gate passed: the precision-decline phenomenon appears at non-saturating
+recall, licensing the move to mitigations.
 
 ---
 
 ## Phase 1.C — Mitigation comparison (Pareto plane)
 
-**What was run.** Sweep of the novelty:replication reward ratio across
-{1, 2, 5, 10, 20, 50} × {no mitigation, pre-registration (leaky, qrp*cap=0.1),
-replication+retraction, invariance (k=2), invariance (k=3), invariance (k=4),
-all-on}; 10 seeds per condition. Systematic-bias active at
-`bias_strength = 0.5` (moderate — per-(h, ctx) bias SD = 0.5 vs. unit-variance
-sampling noise). The hypothesis space is sized to represent the realistic
-"vast hypothesis space, scarce attention" regime: `n_hypotheses = 10,000`
-against ~22,500 novel actions over the run gives ~2.25 studies per
-hypothesis under uniform random selection — most plausible hypotheses go
-unstudied, recall stays meaningfully below 1.0 even without any mitigation.
-`n_contexts = 4` so k = 4 is the strictest possible invariance bar (finding
-must appear in every context). Pre-registration is modeled as \_leaky*:
-qrp_cap = 0.1 allows residual analytic flexibility, since perfect enforcement
-is unrealistic and would only set an upper bound.
+**What was run.** The Phase-0 reward-ratio sweep {1, 2, 5, 10, 20, 50} × seven
+mitigation conditions {none, pre-registration (leaky, `qrp_cap=0.1`),
+replication+retraction, invariance (k=2/3/4), all-on}; 10 seeds each.
+Systematic bias active at `bias_strength = 0.5` (per-(h, ctx) bias SD = 0.5 vs.
+unit-variance sampling noise). Same regime as Phase 0 (`n_hypotheses = 10,000`,
+≈2.25 studies/hypothesis, `n_contexts = 4` so k=4 is the strictest invariance
+bar). Pre-registration is _leaky_ — `qrp_cap = 0.1` allows residual analytic
+flexibility, since perfect enforcement is unrealistic.
 Script: [`scripts/run_mitigation_comparison.py`](../scripts/run_mitigation_comparison.py).
 
 > **Note on the noise model.** This run uses the corrected additive-bias
@@ -98,26 +82,18 @@ jump for moderate recall cost. Replication+retraction and invariance k=3 sit
 between, with invariance k=3 slightly higher in precision. Choice depends on
 which end of the frontier matters in deployment.
 
-**Why `none` recall lands at ~0.75, not 1.0**: per-study power under default
-config (effect size d ≈ 0.4, n = 30 samples, α = 0.05) is ~0.71 without QRP
-and ~0.90 with moderate QRP. With ~2.25 studies per H, recall ≈ 1 −
-exp(−2.25 × effective_power) ≈ 0.75–0.80. Systematic bias at `bias_strength`
-= 0.5 doesn't reduce per-study power directly; rather, it inflates the
-average false-positive rate by adding a per-(h, ctx) offset to Z. This
-represents the model's output for "moderately-studied effects in a vast
-hypothesis space" — the regime where the replication-crisis dynamic is
-interpretable.
+**Why `none` recall is ~0.75, not 1.0**: at ≈2.25 studies/H and per-study power
+~0.71 (without QRP), recall ≈ 1 − exp(−2.25 × power) ≈ 0.75. Bias at
+`bias_strength = 0.5` doesn't lower power — it inflates the false-positive rate
+via the per-(h, ctx) offset. This is the "moderately-studied effects in a vast
+hypothesis space" regime where the replication-crisis dynamic is interpretable.
 
-**Why high-k invariance publishes so little**: with ~2.25 studies per H and
-uniform context sampling over 4 contexts, the expected number of distinct
-contexts hit per H is 4 × (1 − (3/4)^2.25) ≈ 1.85. So k = 2 catches ~38% of
-true H, k = 3 catches ~11%, k = 4 catches ~1%. **This is a real finding, not
-an artifact: strict invariance is data-hungry.** The regime where high-k
-invariance shines is one where attention concentrates on a subset of
-hypotheses — i.e., real scientific practice, where well-studied topics
-accumulate evidence across many labs/contexts while the long tail goes
-unstudied. The non-uniform-selection upgrade that would model this is
-tracked in [FUTURE_WORK.md](../FUTURE_WORK.md).
+**Why high-k invariance publishes so little**: at ≈2.25 studies/H over 4
+contexts, each H reaches only ≈1.85 distinct contexts (coupon-collector), so
+k=2/3/4 catch ~38%/~11%/~1% of true H. **A real finding, not an artifact:
+strict invariance is data-hungry** — it works where attention concentrates
+(well-studied topics), not on the long tail. The non-uniform-attention upgrade
+that models this is tracked in [FUTURE_WORK.md](../FUTURE_WORK.md).
 
 **Why `all-on` collapses to k=4-like behavior**: the strictest filter in the
 stack dominates. Once k = 3 invariance is in place, it gates publication so
@@ -197,26 +173,6 @@ current uniform-attention model: at ~2.25 studies/H, k=3 catches ~11% of
 true H and k=4 catches ~2% — too few findings to compare meaningfully
 against R+R. Phase 2's non-uniform-attention upgrade is the prerequisite
 for running it.
-
-**Why k=2 invariance leaks**: each context's bias is an independent N(0,1)
-draw (at bs=1.0). For a false H to clear invariance k=2 by chance, it needs
-positive bias in any 2 of 4 contexts — a non-trivial probability. The filter
-catches FPs whose bias was lucky in only one context, but lets through FPs
-whose bias was lucky in two. **The filter scales with k**: at k=4, the false
-H needs lucky bias in all 4 contexts — much rarer. So the bias-robustness
-prediction is geometrically tied to k, and k=2 is structurally the weakest
-version of the test.
-
-**Why R+R holds up at moderate bias but breaks at high bias**: audit
-replicates draw _fresh_ private noise (the variance-fix). At low-moderate
-bias (bs ≤ 1), most FPs are "lucky-by-bias-AND-private together" — bias
-alone is rarely big enough to clear z_crit on its own (z_crit ≈ 1.96; at
-bs=1.0, P(|bias| > z_crit) ≈ 5%), so audit's fresh private noise breaks
-the combination and retracts FPs. At high bias (bs ≥ 2), P(|bias| > z_crit)
-becomes substantial (≈ 32% at bs=2, ≈ 69% at bs=5) — bias alone drives
-significance, audit always confirms because it inherits the same bias,
-and R+R can no longer distinguish FPs from TPs. This steep (but smooth)
-transition falls between bs=1 and bs=2 — a region not yet directly sampled.
 
 **Where this points next**:
 
