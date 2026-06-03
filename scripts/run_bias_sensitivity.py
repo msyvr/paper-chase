@@ -109,7 +109,8 @@ N_HYPOTHESES = 10_000          # same regime as Phase 1.C — sparse-attention w
 # Scope chosen for the comparison Phase 1.D is built around:
 #   * `none` — baseline reference; precision should fall with bias (lucky-bias FPs persist)
 #   * `pre-registration (leaky)` — bias-orthogonal control (clamps QRP, doesn't touch bias)
-#   * `replication+retraction` — audit-style; predicted to degrade with bias
+#   * `replication+retraction` — same-base audit-style; predicted to degrade with bias
+#   * `replication+retraction (cross-model)` — independent-auditor variant; predicted to recover
 #   * `invariance (k=2)` — invariance-style; predicted to be bias-robust
 #
 # k=3, k=4 invariance are excluded because at this regime (sparse uniform
@@ -119,6 +120,7 @@ MITIGATION_FACTORIES = {
     "none":                          lambda: [],
     "pre-registration (leaky)":      lambda: [PreRegistration(qrp_cap=0.1)],
     "replication+retraction":        lambda: [ReplicationAndRetraction(audit_fraction=0.1)],
+    "replication+retraction (cross-model)": lambda: [ReplicationAndRetraction(audit_fraction=0.1, cross_model=True)],
     "invariance (k=2)":              lambda: [InvarianceRequirement(k_contexts=2)],
 }
 
@@ -146,6 +148,7 @@ def main() -> None:
             "mitigation_parameters": {
                 "pre-registration (leaky)": "PreRegistration(qrp_cap=0.1)",
                 "replication+retraction":   "ReplicationAndRetraction(audit_fraction=0.1)",
+                "replication+retraction (cross-model)": "ReplicationAndRetraction(audit_fraction=0.1, cross_model=True)",
                 "invariance (k=2)":         "InvarianceRequirement(k_contexts=2)",
             },
         },

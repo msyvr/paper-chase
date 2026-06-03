@@ -141,7 +141,27 @@ independent bias draw, so a single lucky bias cannot carry an FP through.
 | 2.0  | 0.13 / 0.77 | 0.14 / 0.73 | 0.30 / 0.39 | 0.18 / 0.37 |
 | 5.0  | 0.11 / 0.83 | 0.11 / 0.81 | 0.11 / 0.64 | 0.11 / 0.45 |
 
-_(precision / recall per cell; 30 seeds, 95% CIs ≈ ±0.005–0.03 on precision — see FINDINGS.md Finding 3 for the R+R column with explicit CIs. Read the R+R column top-to-bottom for the smooth 1→2 descent.)_
+_(precision / recall per cell; 30 seeds, 95% CIs ≈ ±0.005–0.03 on precision — see FINDINGS.md Finding 3 for the R+R column with explicit CIs. Read the R+R column top-to-bottom for the smooth 1→2 descent. The figure also plots a fifth curve — R+R with a *cross-model* auditor — compared just below.)_
+
+**Cross-model audit — a partial fix.** Swap the same-base auditor (which reuses the original's
+bias) for a *different* model (the auditor draws its own independent per-(h, ctx) bias). It
+recovers precision where same-base audit fails — but only partially:
+
+| bias_strength | same-base R+R | cross-model R+R | lift |
+|---|---|---|---|
+| 1.0  | 0.83 | 0.85 | +0.03 |
+| 1.25 | 0.71 | 0.77 | +0.07 |
+| 1.5  | 0.54 | 0.65 | **+0.11** |
+| 1.75 | 0.39 | 0.49 | +0.09 |
+| 2.0  | 0.30 | 0.37 | +0.08 |
+| 5.0  | 0.11 | 0.11 | ~0 |
+
+_(precision; 30 seeds, CIs ≈ ±0.01.)_ Independence breaks the *exact* bias-inheritance that dooms
+same-base audit, so the cross-model auditor retracts bias-driven FPs the same-base one confirms —
+but a different model is still a model, with its own independent bias, so it re-confirms some FPs
+by *its* bias and the recovery is partial. At extreme bias the auditor is as overwhelmed as the
+original → no lift. The cleaner the auditor's independence (and the lower its own bias), the more
+it recovers; at the limit you fix the model, not the audit (Finding 8). See FINDINGS Finding 9.
 
 **Where the data points.** Two distinct dynamics show up across the
 extended range, neither of which is the predicted invariance-overtakes-R+R

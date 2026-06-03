@@ -421,6 +421,50 @@ mechanism is mechanistically transparent. Generalisation to other
 
 ---
 
+## 9. Cross-model audit partially recovers precision; independence helps, the auditor's own bias caps it
+
+**Regime.** Phase 1.D densified, 30 seeds. Cross-model R+R: the auditor draws its *own*
+independent per-(h, ctx) bias ~ N(0, bias_strength²) instead of reusing the original's —
+modelling audit-by-a-different-base-model.
+
+**Result.** Cross-model R+R precision exceeds same-base across the moderate-bias band:
+
+| bias_strength | same-base R+R | cross-model R+R | lift |
+|---|---|---|---|
+| 0.0 | 0.929 ± 0.004 | 0.929 ± 0.004 | 0.000 |
+| 1.0 | 0.825 ± 0.008 | 0.851 ± 0.007 | +0.026 |
+| 1.25 | 0.706 ± 0.010 | 0.772 ± 0.008 | +0.066 |
+| 1.5 | 0.537 ± 0.010 | 0.648 ± 0.011 | **+0.111** |
+| 1.75 | 0.393 ± 0.007 | 0.486 ± 0.011 | +0.093 |
+| 2.0 | 0.295 ± 0.005 | 0.371 ± 0.010 | +0.076 |
+| 5.0 | 0.112 ± 0.001 | 0.114 ± 0.002 | +0.002 |
+
+(30 seeds; ± is the 95% t-CI. bs=0.5 omitted — both ≈0.91, lift ≈0.) The lift is significant
+(CIs ≈ ±0.01) across bs ∈ [1, 2], peaks at bs=1.5 (+0.11), and is ≈0 at the endpoints (no bias
+at bs=0; both at the floor at bs=5).
+
+**Mechanism.** Same-base audit reuses the original's bias, so it confirms every bias-driven FP.
+Cross-model audit draws an *independent* bias, breaking the exact inheritance — so it retracts
+the bias-driven FPs same-base cannot. But the cross-model auditor is *itself* biased (same
+magnitude, independent draw), so it confirms some FPs by its own bias: the recovery is
+**partial, not complete**. At extreme bias the auditor is as overwhelmed as the original → no lift.
+
+**Real-world translation.** Auditing automated science with a *different* model recovers part of
+the precision a same-model audit loses — the value is in the auditor's errors being *uncorrelated*
+with the original's. But a different model is still a model: the cleaner its independence (and the
+lower its own bias on the relevant questions), the more it recovers; at extreme model bias no
+audit helps and you fix the model (Finding 8). Actionable read: prefer a different-family auditor,
+the further from the original's blind spots the better.
+
+**What hasn't been tested.** Cross-model with a *lower* auditor bias (a less-biased auditor →
+fuller recovery). This experiment held the auditor's bias equal to the original's, isolating the
+independence effect; a better auditor is a separate, expected lift.
+
+**Status.** Established (the lift is significant across the moderate-bias band; mechanism
+transparent and consistent with Finding 8 at the extreme).
+
+---
+
 ## Open questions worth elevating to findings later
 
 The findings above are what we can say with mechanism and evidence today.
@@ -431,9 +475,11 @@ likely candidates for entries once Phase 2 and the cheap extensions land.
   R+R break down?** Mechanistically expected; sweep is cheap.
 - **At high k under non-uniform attention, does invariance dominate same-base
   R+R?** The proper test of the project's central claim.
-- **Does cross-base audit close the gap between same-base R+R and
-  invariance?** Tests whether the project's claim is really about
-  audit-semantics or about mitigation-type.
+- ~~Does cross-base audit close the gap between same-base R+R and invariance?~~
+  **Answered → Finding 9:** cross-model audit *partially* recovers precision —
+  independence breaks the bias-inheritance, but the auditor's own bias caps it. The
+  claim is about audit-semantics (independence of the auditor's errors), not
+  mitigation-type.
 - **Does non-uniform (power-law) attention recover realistic recall while
   letting high-k invariance function?** The decoupling Phase 2 aims for.
 

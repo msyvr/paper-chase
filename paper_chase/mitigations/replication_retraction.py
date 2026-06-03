@@ -2,12 +2,13 @@
 
 Models post-publication scrutiny: each step, sample a fraction of standing
 findings, run a fresh study on each, and retract any whose audit replication
-is non-significant. The audit study uses the SAME per-(hypothesis, context)
-systematic bias as the original (from the sim's ``biases`` dict) — modelling
-"audit by the same base model." The audit's *private* (sampling) noise is
-fresh; only the shared systematic bias is reused. This is the realistic
-baseline; cross-model audits (audit using a different base model → independent
-bias draw) is a planned variant.
+is non-significant. By default the audit uses the SAME per-(hypothesis, context) systematic bias as
+the original (from the sim's ``biases`` dict) — modelling "audit by the same base
+model," which *inherits* the original's blind spot. With ``cross_model=True`` the
+audit instead uses the auditor's OWN per-(h, ctx) bias, drawn independently of the
+original's — modelling "audit by a *different* base model" whose systematic bias is
+uncorrelated with the original's. In both modes the audit's *private* (sampling)
+noise is fresh; only the systematic-bias source differs.
 
 This is the "+retraction" side of "incentivized replication + retraction." The
 "incentivized" side lives in :class:`IncentiveConfig` (raise ``replication_weight``
@@ -46,6 +47,12 @@ class ReplicationAndRetraction:
         QRP intensity for audit studies. ``0.0`` (default) = pristine audit
         (the auditor doesn't p-hack). Values > 0 model audits that themselves
         have some methodological flexibility.
+    cross_model
+        ``False`` (default) → same-base audit: reuse the original's per-(h, ctx)
+        bias (the audit inherits the blind spot). ``True`` → cross-model audit:
+        the auditor draws its own independent per-(h, ctx) bias ~ N(0,
+        bias_strength²), recovering precision against shared-bias false positives
+        a same-base audit cannot retract.
     """
 
     def __init__(
@@ -53,6 +60,7 @@ class ReplicationAndRetraction:
         audit_fraction: float = 0.1,
         audit_sample_size: int | None = None,
         audit_qrp_intensity: float = 0.0,
+        cross_model: bool = False,
     ) -> None:
         if not 0.0 <= audit_fraction <= 1.0:
             raise ValueError(f"audit_fraction must be in [0, 1], got {audit_fraction}")
@@ -63,6 +71,10 @@ class ReplicationAndRetraction:
         self.audit_fraction = audit_fraction
         self.audit_sample_size = audit_sample_size
         self.audit_qrp_intensity = audit_qrp_intensity
+        self.cross_model = cross_model
+        # Cross-model auditor's own per-(h, ctx) bias, independent of the
+        # original's. Lazily populated; stateful → use a fresh instance per run.
+        self._audit_biases: dict[tuple[int, int], float] = {}
 
     def constrain_action(
         self,
@@ -108,12 +120,23 @@ class ReplicationAndRetraction:
                 if self.audit_sample_size is not None
                 else target.sample_size
             )
-            # Same-base-model audit: reuse the per-(h, ctx) systematic bias.
-            # If bias_strength = 0 (biases dict empty) the lookup falls back to
-            # 0, the neutral value for independent-error studies. The audit's
-            # private (sampling) noise is fresh — only the systematic bias is
-            # carried over.
-            bias = biases.get((target.hypothesis_id, target.context_id), 0.0)
+            key = (target.hypothesis_id, target.context_id)
+            if self.cross_model:
+                # Cross-model audit: a *different* base model re-tests, with its
+                # own per-(h, ctx) systematic bias, drawn independently of the
+                # original's. (At bias_strength = 0 every bias is 0, so this
+                # reduces to the independent-error baseline.)
+                if key not in self._audit_biases:
+                    self._audit_biases[key] = (
+                        float(rng.normal(0.0, cfg.study.bias_strength))
+                        if cfg.study.bias_strength > 0.0 else 0.0
+                    )
+                bias = self._audit_biases[key]
+            else:
+                # Same-base audit: reuse (inherit) the original's per-(h, ctx)
+                # bias. The audit's private (sampling) noise is fresh — only the
+                # systematic bias is carried over. Empty dict → 0 (bias_strength=0).
+                bias = biases.get(key, 0.0)
 
             significant, _ = run_study(
                 hypothesis=hypothesis,
