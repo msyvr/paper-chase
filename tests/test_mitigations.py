@@ -269,6 +269,74 @@ def test_replication_retraction_preserves_strong_true_positives():
     )
 
 
+# ---- cross-model audit (Finding 9: partial recovery) ----
+
+def test_cross_model_flag_defaults_false():
+    """``cross_model`` defaults to same-base audit; the flag round-trips."""
+    assert ReplicationAndRetraction().cross_model is False
+    assert ReplicationAndRetraction(cross_model=True).cross_model is True
+
+
+def test_cross_model_reduces_to_same_base_at_zero_bias():
+    """At ``bias_strength=0`` there is no systematic bias to inherit or redraw, so
+    cross-model and same-base audits must be bit-identical.
+
+    The cross-model branch takes its ``else 0.0`` path (auditor bias = 0) *without*
+    drawing from the RNG, so the audit's study-RNG stream is untouched and both
+    modes call ``run_study`` with bias=0. This pins the "cross-model reduces to the
+    independent-error baseline at zero bias" claim and guards the existing suite,
+    which runs at ``bias_strength=0`` with ``cross_model=False``."""
+    cfg = _common_cfg()  # bias_strength = 0.0
+    result_same = run(
+        cfg, mitigations=[ReplicationAndRetraction(audit_fraction=1.0, cross_model=False)]
+    )
+    result_cross = run(
+        cfg, mitigations=[ReplicationAndRetraction(audit_fraction=1.0, cross_model=True)]
+    )
+    assert _literature_summary(result_same) == _literature_summary(result_cross)
+
+
+def test_cross_model_draws_independent_audit_bias():
+    """With ``bias_strength>0`` the cross-model auditor draws its OWN per-(h, ctx)
+    bias instead of inheriting the original's.
+
+    Mechanism: a cross-model instance populates its ``_audit_biases`` cache (the
+    independent draws); a same-base instance never writes to it. Consequence: the
+    two audits reach different retraction decisions, so the standing literatures
+    diverge — same-base re-confirms the bias-sustained false positives that
+    cross-model retracts (Finding 9's partial recovery, in miniature)."""
+    cfg = SimConfig(
+        world=WorldConfig(
+            n_hypotheses=200, base_rate_true=0.2,
+            effect_size_mean=0.4, effect_size_sd=0.0, seed=0,
+        ),
+        agent=AgentConfig(
+            n_agents=20, qrp_mean=0.5, qrp_sd=0.0,
+            effort_mean=30.0, effort_sd=0.0, p_replicate=0.0,
+        ),
+        study=StudyConfig(alpha=0.05, qrp_alpha_max=0.50, bias_strength=1.5),
+        incentive=IncentiveConfig(
+            novel_weight=30.0, replication_weight=1.0, effort_cost_per_sample=0.0,
+        ),
+        n_steps=20,
+        seed=0,
+    )
+    mit_same = ReplicationAndRetraction(audit_fraction=1.0, cross_model=False)
+    mit_cross = ReplicationAndRetraction(audit_fraction=1.0, cross_model=True)
+    result_same = run(cfg, mitigations=[mit_same])
+    result_cross = run(cfg, mitigations=[mit_cross])
+
+    # Mechanism: the cross-model instance cached independent auditor biases;
+    # the same-base instance left its cache empty.
+    assert mit_cross._audit_biases, "cross-model audit must draw its own per-(h, ctx) biases"
+    assert mit_same._audit_biases == {}, "same-base audit must not draw independent biases"
+
+    # Consequence: divergent retraction outcomes → different standing literatures.
+    assert _literature_summary(result_same) != _literature_summary(result_cross), (
+        "cross-model and same-base audits should diverge when bias_strength>0"
+    )
+
+
 # ---- QRP-deterrence wiring (credit-for-replication) ----
 
 def test_credit_for_replication_reduces_effective_qrp():
