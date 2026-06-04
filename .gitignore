@@ -10,5 +10,7 @@ build/
 *.log
 results/
 tmp/
+# local-only working drafts (not for publication)
+docs/papers/drafts/
 .DS_Store
 .ipynb_checkpoints/
