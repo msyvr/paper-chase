@@ -27,7 +27,7 @@ Builds on Smaldino & McElreath, _[The natural selection of bad science](https://
 
 ## Status
 
-For recent results, see [example runs](example-runs/README.md).
+For recent results, see [example runs](example-runs/README.md). For the curated synthesis — established findings by regime, each with mechanism and a status tag — see [FINDINGS.md](FINDINGS.md).
 
 Statistical engine validated (FPR ≈ α at q=0; power monotone in n)
 
