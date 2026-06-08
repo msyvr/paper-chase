@@ -2,10 +2,14 @@
 
 Agent-based simulation of automated science under publish-or-perish incentives.
 
-Paper-chase is a multi-agent simulation of a scientific publishing ecosystem.
-The Pareto frontier for truth-content (precision) and discovery rate (recall)
-of the body of literature is evaluated as a function of
-incentive pressure and systematic bias.
+Paper-chase simulates a scientific publishing ecosystem to test which governance
+interventions keep the literature's truth-content (precision) and discovery rate
+(recall) high as agents optimize for novelty rewards. Each intervention —
+pre-registration, replication-and-retraction, measurement-invariance — is mapped
+onto the precision/recall Pareto plane across incentive pressure and systematic
+bias. A recurring result: an independent, cross-model auditor recovers precision
+that a same-base-model auditor cannot, because a same-source check carries the
+same systematic bias it is meant to catch.
 
 We start with a validity gate on the statistical engine. As incentives increase
 reward for novel results over replication of previously published work, the
